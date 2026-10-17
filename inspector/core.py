@@ -200,6 +200,8 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     paytable = parse_paytable(response.get("paytable", ""))
     width = int(response.get("sw", "0")) if response.get("sw", "").isdigit() else 0
     height = int(response.get("sh", "0")) if response.get("sh", "").isdigit() else 0
+    from .direct_model import compute_direct_model
+    direct = compute_direct_model(sets, width, height)
     audits = [observe_spin(x["screen"], sets, width, height)
               for x in spins if isinstance(x["screen"], str) and len(x["screen"]) <= 300]
     symbol = latest.get("symbol")
@@ -224,6 +226,8 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "scope": "DIRECT_CIRCULAR_RAW_STOP_NO_TRANSFORMATIONS",
         "status": "OK_INIT" if initializations else "NO_INIT",
         "historical_direct_model_audit": audits,
+        "direct_model_union_unique_screen_count": direct["union_unique_screen_count"],
+        "direct_model_duplicates_removed": direct["duplicated_across_sets"],
     }
     out.mkdir(parents=True, exist_ok=True)
     write_json(out / "summary.json", summary)
@@ -232,6 +236,7 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "does_not_prove_final_outcome_impossibility": True,
     })
     write_json(out / "paytable.json", paytable)
+    write_json(out / "direct_model.json", direct)
     write_json(out / "assets_index.json", static_assets)
     write_json(out / "historical_audit.json", audits)
     # HAR depurado y reducido: solo doInit y claves públicas conocidas.
@@ -260,6 +265,8 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "Inicializaciones: " + str(len(initializations)),
         "Conjuntos: " + str(len(sets)),
         "Tiras: " + str(summary["reel_strip_count"]),
+        "Pantallas únicas en modelo directo: " + str(direct["union_unique_screen_count"]),
+        "Duplicados entre conjuntos: " + str(direct["duplicated_across_sets"]),
         "Recursos estáticos indexados: " + str(len(static_assets)),
         "build.js observado: " + str(summary["has_build_js"]),
         "Giros enviados por Inspector: 0",
