@@ -306,8 +306,8 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     # Solo líneas con referencias espaciales coherentes, y no sobreafirmar
     # que el servidor las haya habilitado para la apuesta actual.
     pay_contract["declared_line_paths"] = [
-        row["positions_row_major"] for row in line_scene["lines_recovered"]
-    ]
+        row["symbol_indices"] for row in line_contract["extracted_paths"]
+    ] if line_contract["geometry_complete"] else []
     pay_contract["scene_declared_line_paths_recovered"] = bool(
         line_scene["complete_declared_scene_paths_recovered"]
     )
@@ -334,6 +334,8 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
             v["field"]: v["line_info_records"]
             for v in line_candidates["candidate_fields"]
         },
+        "lineinfo_unique_vectors": line_candidates["unique_index_vectors_total"],
+        "lineinfo_repeated_identical": line_candidates["contains_repeated_identical_lineinfo"],
         "wild_W_reels": wild["reels_containing_W_directly_by_set"],
         "stake_sc_values_count": stake["sc_count"],
         "stake_bls_values": stake["bls_values"],
@@ -434,6 +436,8 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "build.js observado: " + str(summary["has_build_js"]),
         "LineInfo por campo: " + ", ".join(
             f"{x['field']}={x['line_info_records']}" for x in line_candidates["candidate_fields"]),
+        "Vectores LineInfo distintos: " + str(line_candidates["unique_index_vectors_total"]),
+        "LineInfo repetidos idénticos: " + str(line_candidates["contains_repeated_identical_lineinfo"]),
         "Líneas extraídas de escena: " + str(len(line_scene["lines_recovered"]))
         + "; cobertura: " + line_scene["line_path_coverage"],
         "sc declaradas: " + str(stake["sc_count"])
