@@ -153,6 +153,8 @@ def inspect_line_scene(har_path: str | Path, game_symbol: str | None,
         "vs_lines_definitions_count": 0,
         "declared_line_counts": [],
         "line_component_shapes": [],
+        "symbol_squares_probe": [],
+        "symbol_squares_not_yet_accepted_as_paylines": True,
         "lines_recovered": [],
         "line_path_coverage": "NOT_AVAILABLE",
         "complete_all_active_paylines_known": False,
@@ -220,6 +222,52 @@ def inspect_line_scene(har_path: str | Path, game_symbol: str | None,
                         for key, value in sorted(d.items())
                         if key in {"lines","reels","symbolSquares","symbols","xtEnabled","patterns","lineDefinitions"}
                     })
+                    # Inspeccionar la representación real de LineInfo dentro
+                    # de symbolSquares, sin divulgar recursos ni arrays completos.
+                    squares = d.get("symbolSquares")
+                    if isinstance(squares, list):
+                        sample, classes = [], {}
+                        for n, item in enumerate(squares[:200]):
+                            if not isinstance(item, dict):
+                                continue
+                            serial = item.get("serializableData") or {}
+                            if not isinstance(serial, dict):
+                                continue
+                            values = serial.get("symbolIndices")
+                            valid_int = isinstance(values, list) and all(
+                                type(v) is int and 0 <= v < 1000 for v in values)
+                            if valid_int:
+                                pos = values
+                                row = (len(pos) == width and
+                                       all(pos[i] % width == i for i in range(width)))
+                                column = (len(pos) == width and
+                                          all(pos[i] // height == i for i in range(width)))
+                                form = ("BOTH_ORDERS" if row and column else
+                                        "ROW_MAJOR" if row else
+                                        "COLUMN_MAJOR" if column else "OTHER_INDICES")
+                                classification = f"length_{len(pos)}_{form}"
+                            else:
+                                classification = "NO_SMALL_INTEGER_SYMBOL_INDICES"
+                            classes[classification] = classes.get(classification, 0) + 1
+                            if len(sample) < 8:
+                                sample.append({
+                                    "index": n,
+                                    "nested_type": item.get("nestedFieldType")
+                                        if isinstance(item.get("nestedFieldType"), str) else None,
+                                    "field_names": sorted(k for k in serial
+                                                          if isinstance(k, str)
+                                                          and len(k) < 50)[:20],
+                                    "symbol_indices": values[:12] if valid_int else None,
+                                    "direction": (serial.get("isRightToLeft")
+                                                  if type(serial.get("isRightToLeft")) is bool
+                                                  else None),
+                                    "classification": classification,
+                                })
+                        out["symbol_squares_probe"].append({
+                            "items": len(squares), "shape_counts": classes,
+                            "first_examples": sample,
+                            "full_payline_meaning_confirmed": False,
+                        })
                     for possible in _iter_nodes(d):
                         path = _valid_path(possible, width, height)
                         if path is not None:
