@@ -156,6 +156,7 @@ def inspect_line_scene(har_path: str | Path, game_symbol: str | None,
         "lines_recovered": [],
         "line_path_coverage": "NOT_AVAILABLE",
         "complete_all_active_paylines_known": False,
+        "complete_declared_scene_paths_recovered": False,
         "line_direction_known_for_all": False,
         "active_line_count_selected_in_session": "UNKNOWN",
         "wild_substitution_semantics": "UNKNOWN",
@@ -246,8 +247,10 @@ def inspect_line_scene(har_path: str | Path, game_symbol: str | None,
     rows = out["lines_recovered"]
     if rows and counts and all(v == len(rows) for v in counts):
         out["line_path_coverage"] = "MATCHES_DECLARED_SCENE_LINE_COUNT"
-        out["complete_all_active_paylines_known"] = all(
+        out["complete_declared_scene_paths_recovered"] = all(
             line["direction"] != "UNKNOWN" for line in rows)
+        # La escena no prueba que estas líneas estuvieran habilitadas en una
+        # apuesta concreta; esa evidencia requiere el estado de sesión.
     elif rows:
         out["line_path_coverage"] = "PARTIAL_OR_CONFLICTING_LINE_COUNT"
     elif counts:
