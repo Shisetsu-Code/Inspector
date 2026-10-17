@@ -7,6 +7,7 @@ import tempfile
 
 from .core import analyze_har
 from .capture import capture_official_demo
+from .direct_model import check_screen
 
 
 def main(argv=None) -> int:
@@ -24,8 +25,18 @@ def main(argv=None) -> int:
     c.add_argument("--keep-raw-har", type=Path, default=None,
                    help="Guardar HAR completo PRIVADO (nunca subir al repositorio)")
     c.add_argument("--require-init", action="store_true")
+    k = sub.add_parser("check", help="Comprobar pantalla contra ventanas directas")
+    k.add_argument("result_folder", type=Path)
+    k.add_argument("screen", help="Cadena row-major o column-major de ancho x alto")
     args = parser.parse_args(argv)
     try:
+        if args.command == "check":
+            model = json.loads((args.result_folder / "reel_rules.json").read_text(encoding="utf-8"))
+            summary = json.loads((args.result_folder / "summary.json").read_text(encoding="utf-8"))
+            result = check_screen(model["sets"], summary["geometry"]["width"],
+                                  summary["geometry"]["height"], args.screen)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
         if args.command == "analyze":
             result = analyze_har(args.har, args.out)
         else:
