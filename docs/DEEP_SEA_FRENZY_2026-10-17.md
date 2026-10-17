@@ -67,8 +67,8 @@ La siguiente cifra fue calculada con las tiras de los cinco reel_set de la captu
 | **Duplicados entre conjuntos** | — | **2.080** |
 | **Unión sin duplicados** | — | **6.399.810.846** |
 
-Un testigo sintético reproducible del conjunto 0, ordenado por filas: \`943bb39531a1S7452883\`. Su compatibilidad con ventanas directas no implica que sea una tirada autorizada por el backend.
+Un testigo sintético reproducible del conjunto 0, ordenado por filas: `943bb39531a1S7452883`. Su compatibilidad con ventanas directas no implica que sea una tirada autorizada por el backend.
 
-El histograma exacto de cantidad de \`S\` se exporta en \`direct_model.json\`, sin pesos ni frecuencias. Las ventanas extraídas de las tiras no contienen \`S\` en el quinto carrete. Estas restricciones son válidas **dentro del modelo directo sin transformaciones**; no constituyen prohibiciones globales para los resultados del servidor.
+El histograma exacto de cantidad de `S` se exporta en `direct_model.json`, sin pesos ni frecuencias. Las ventanas extraídas de las tiras no contienen `S` en el quinto carrete. Estas restricciones son válidas **dentro del modelo directo sin transformaciones**; no constituyen prohibiciones globales para los resultados del servidor.
 
-La nueva herramienta permite comprobar una pantalla de 20 símbolos desde la GUI o con el comando \`python -m inspector.cli check <carpeta> <pantalla>\`.
+La nueva herramienta permite comprobar una pantalla de 20 símbolos desde la GUI o con el comando `python -m inspector.cli check <carpeta> <pantalla>`.

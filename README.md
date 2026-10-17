@@ -46,15 +46,15 @@ En cada ejecución, descargar el artefacto inspector-resultados-depurados. No se
 
 ### Clasificación exacta del modelo de paradas directas
 
-Después de la captura, Inspector calcula la unión de pantallas de todos los reel_set completos sin generar combinaciones una por una. Se publica como \`direct_model.json\` (conteos, duplicados y distribución de cantidad de símbolos \`S\`); el modelo **no es el RNG real**.
+Después de la captura, Inspector calcula la unión de pantallas de todos los reel_set completos sin generar combinaciones una por una. Se publica como `direct_model.json` (conteos, duplicados y distribución de cantidad de símbolos `S`); el modelo **no es el RNG real**.
 
-Para comprobar una pantalla desde Windows, abrí la GUI, analizá un HAR, introducí una cadena de símbolos de longitud \`sw × sh\` y pulsá **Comprobar pantalla**. El mensaje diferencia \`MATCH\` de \`NOT_IN_DIRECT_MODEL\` y siempre conserva \`server_outcome_validity=UNKNOWN\`.
+Para comprobar una pantalla desde Windows, abrí la GUI, analizá un HAR, introducí una cadena de símbolos de longitud `sw × sh` y pulsá **Comprobar pantalla**. El mensaje diferencia `MATCH` de `NOT_IN_DIRECT_MODEL` y siempre conserva `server_outcome_validity=UNKNOWN`.
 
 Desde consola:
 
     py -3 -m inspector.cli check "resultado" "943bb39531a1S7452883"
 
-El ejemplo corresponde a Deep Sea Frenzy (5×4) y a una pantalla de parada directa reconstruida de \`reel_set0\`. No es una tirada real registrada.
+El ejemplo corresponde a Deep Sea Frenzy (5×4) y a una pantalla de parada directa reconstruida de `reel_set0`. No es una tirada real registrada.
 
 Detalles matemáticos y verificación: [Modelo de paradas directas](docs/MODELO_DIRECTO.md).
 
