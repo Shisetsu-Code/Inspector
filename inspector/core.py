@@ -150,6 +150,7 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     if not isinstance(entries, list):
         raise ValueError("HAR inválido: log.entries no es una lista")
     initializations, spins, static_assets = [], [], {}
+    official_features = None
     counters = Counter()
     for entry in entries:
         request, response = entry.get("request") or {}, entry.get("response") or {}
@@ -157,6 +158,19 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         try:
             parsed = urlsplit(url)
         except ValueError:
+            continue
+        if (parsed.scheme == "https" and parsed.hostname in
+                {"www.pragmaticplay.com", "pragmaticplay.com"}
+                and request.get("method") == "GET"
+                and response.get("status") == 200
+                and re.fullmatch(r"/(?:en|es)/games/[a-z0-9-]+/?", parsed.path)):
+            from .official_rules import extract_official_feature_rules
+            source = har_body(response.get("content") or {})
+            if 0 < len(source) <= 10_000_000:
+                slug = parsed.path.rstrip("/").split("/")[-1]
+                found = extract_official_feature_rules(source, game_slug=slug)
+                if found["status"] == "PUBLIC_DESCRIPTION_CONDITION_PARSED":
+                    official_features = found
             continue
         if parsed.scheme != "https" or parsed.hostname != DEMO_HOST:
             continue
@@ -260,6 +274,15 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
             if isinstance(x, dict) and isinstance(x.get("name"), str)
         ],
     )
+    if official_features is None:
+        official_features = {
+            "schema": "inspector/official-feature-rules/v1",
+            "status": "NOT_AVAILABLE_IN_HAR",
+            "bonus_trigger": None,
+            "server_feature_execution_verified": False,
+            "complete_feature_rules_proven": False,
+        }
+    pay_contract["official_description_feature_rules"] = official_features
     summary = {
         "schema": SCHEMA, "game_symbol": symbol,
         "doInit_count": len(initializations), "historical_spins": len(spins),
@@ -273,6 +296,13 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "paytable_three_symbol_paying_ids": pay_contract["symbols_with_3_count_payout"],
         "scatter_declaration_status": pay_contract["scatter"]["status"],
         "free_spins_trigger_verified": False,
+        "official_feature_rules_status": official_features["status"],
+        "official_bonus_min_money_symbols": (
+            official_features["bonus_trigger"]["minimum_money_symbols"]
+            if official_features.get("bonus_trigger") else None),
+        "official_initial_free_spins": (
+            official_features["bonus_trigger"]["awarded_free_spins"]
+            if official_features.get("bonus_trigger") else None),
         "complete_server_math_known": False,
         "final_outcome_universe_known": False,
         "forbidden_final_outcomes_proven": [],
@@ -300,6 +330,7 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     })
     write_json(out / "paytable.json", paytable)
     write_json(out / "payment_contract.json", pay_contract)
+    write_json(out / "official_feature_rules.json", official_features)
     write_json(out / "direct_model.json", direct)
     write_json(out / "client_evidence.json", client)
     write_json(out / "animation_origin_trace.json", animation)
@@ -355,6 +386,9 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "Símbolos con premio declarado desde 3 coincidencias: "
         + ", ".join(summary["paytable_three_symbol_paying_ids"]),
         "Tabla scatter/free spins: " + summary["scatter_declaration_status"],
+        "Ficha oficial de features: " + summary["official_feature_rules_status"],
+        "Umbral de money symbols indicado en ficha oficial: " + str(summary["official_bonus_min_money_symbols"]),
+        "Free spins iniciales indicados en ficha oficial: " + str(summary["official_initial_free_spins"]),
         "Verificación completa del disparo de free spins: NO",
         "Giros enviados por Inspector: 0",
         "Giros históricos observados en el HAR: " + str(len(spins)),
