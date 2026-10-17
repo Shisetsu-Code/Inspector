@@ -9,7 +9,7 @@ import webbrowser
 from .core import analyze_har
 from .direct_model import check_screen
 from .payment_contract import evaluate_symbol_count, evaluate_declared_bonus
-from .screen_evaluator import evaluate_screen_literals
+from .line_evaluator import evaluate_literal_screen
 
 
 def main() -> None:
@@ -82,22 +82,22 @@ def main() -> None:
         try:
             folder = result_folder[0]
             contract = json.loads((folder / "payment_contract.json").read_text(encoding="utf-8"))
-            evidence = json.loads((folder / "line_stake_evidence.json").read_text(encoding="utf-8"))
-            summary = json.loads((folder / "summary.json").read_text(encoding="utf-8"))
-            result = evaluate_screen_literals(
-                screen_text.get().strip(), contract, evidence,
-                summary["geometry"]["width"], summary["geometry"]["height"])
-            if result["status"] == "NO_DECLARED_LINE_PATHS":
-                append("No se recuperaron recorridos de paylines: no es posible calcular premios por pantalla.")
+            geometry = json.loads((folder / "line_geometry.json").read_text(encoding="utf-8"))
+            result = evaluate_literal_screen(screen_text.get().strip(), geometry, contract)
+            if result["evaluation_status"].startswith("NOT_EVALUABLE"):
+                append("No hay líneas con geometría explícita suficiente: " + result["geometry_status"])
             else:
-                append("Coincidencias literales condicionales con entrada en paytable: "
-                       + str(result["conditional_payout_candidates"]))
-                for item in result["matches"]:
-                    if item["paytable_multiplier_if_conditions_met"] is not None:
-                        append("Línea escena {} [{}] {} → coeficiente declarado {} (no cobro)".format(
-                            item["scene_line_index"], item["direction"],
-                            item["line_symbols"], item["paytable_multiplier_if_conditions_met"]))
-            append("Wild, líneas activas y base de liquidación: DESCONOCIDOS; premio monetario NO VERIFICADO.")
+                append("Entradas literales en líneas de escena: "
+                       + str(len([x for x in result["line_results"] if x["paytable_entry"] is not None])))
+                for item in result["line_results"][:60]:
+                    if item["paytable_entry"] is not None:
+                        append("Línea {} [{}] {} -> coeficiente declarado {} (no cobro)".format(
+                            item["line_number_1based"], item["direction"],
+                            item["symbols"], item["paytable_entry"]))
+                if result["unresolved_lines"]:
+                    append("Líneas con símbolos especiales/no identificados: "
+                           + str(len(result["unresolved_lines"])))
+            append("Premio monetario, Wild y líneas activas: DESCONOCIDOS sin respaldo del servidor.")
         except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
             messagebox.showerror("Evaluación de pantalla", str(exc))
     ttk.Button(qrow, text="Evaluar pagos de pantalla", command=query_full_screen_payment).pack(
