@@ -194,9 +194,12 @@ def _scene_components(parts: dict[int, bytes]) -> dict:
     return report
 
 
-def inspect_client_har(har_path: str | Path, game_symbol: str | None = None) -> dict:
+def inspect_client_har(har_path: str | Path, game_symbol: str | None = None,
+                       *, observed_wire_keys: dict | None = None) -> dict:
     build, parts, captured = _resource_map(har_path, game_symbol)
     code, scene = _inspect_source(build), _scene_components(parts)
+    from .animation_trace import analyze_animation_origin
+    animation = analyze_animation_origin(build, scene, observed_wire_keys)
     source_branch = code["proofs"].get("stopping_branch_reads_result_screen_symbols") is True
     scene_stop = scene["reel_stop_uses_response_symbols"] is True
     offline_detached = scene["offline_server_attachment"] == "NULL"
@@ -206,6 +209,7 @@ def inspect_client_har(har_path: str | Path, game_symbol: str | None = None) -> 
         "assets": captured,
         "client_code": code,
         "scene": scene,
+        "animation_origin_trace": animation,
         "conclusions": {
             "client_has_server_result_symbol_stop_path": source_branch,
             "captured_scene_activates_result_symbol_stops": scene_stop,
