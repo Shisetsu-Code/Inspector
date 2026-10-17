@@ -128,3 +128,8 @@ Para consultar Deep Sea Frenzy:
 La GUI incluye controles equivalentes. No se envía ninguna tirada: los escenarios se evalúan sobre declaraciones recuperadas. Que exista una entrada en paytable no significa que una pantalla cualquiera sea ganadora; el cliente puede mostrar premios devueltos por el servidor sin recalcular su matemática.
 
 [Informe verificado de pagos y bonus de Deep Sea Frenzy](docs/DEEP_SEA_PAGOS_Y_BONUS_2026-10-17.md).
+
+## Conclusiones recientes: Deep Sea Frenzy
+
+[Diagnóstico de líneas, `W`, escala monetaria y premios del servidor](docs/DEEP_SEA_DIAGNOSTICO_LINEAS_PAGOS_2026-10-17.md). Inspector comprobó que las 50 entradas `LineInfo` de `symbolSquares` repiten el mismo vector `0,1,2,3,4`: no constituyen 50 rutas ganadoras distintas. La escena no aporta la geometría completa de paylines; la validación de pantalla conserva los premios monetarios como `UNKNOWN` en este juego.
+
