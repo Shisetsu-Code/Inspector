@@ -206,6 +206,28 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     from .direct_model import compute_direct_model
     from .client_evidence import inspect_client_har
     direct = compute_direct_model(sets, width, height)
+    selector_raw = response.get("reel_set")
+    # No persistir el valor sin validarlo; podría contener un payload inesperado.
+    if isinstance(selector_raw, str) and re.fullmatch(r"[0-9]{1,3}", selector_raw):
+        current_set_id = str(int(selector_raw))
+        current_status = ("DECLARED_AND_PRESENT_IN_INIT_SETS"
+                          if current_set_id in sets else "DECLARED_BUT_NOT_IN_INIT_SETS")
+    elif selector_raw is None:
+        current_set_id = None
+        current_status = "NOT_OBSERVED"
+    else:
+        current_set_id = None
+        current_status = "UNRECOGNIZED_FORMAT"
+    selected_set_model = direct["sets"].get(current_set_id, {}) if current_set_id else {}
+    selector_evidence = {
+        "source": "doInit", "selector_key": "reel_set",
+        "status": current_status,
+        "current_reel_set": current_set_id,
+        "current_set_direct_model_unique_screens": selected_set_model.get("unique_screen_count"),
+        "future_set_transition_inferred": False,
+        "global_server_mathematics_known": False,
+        "observed_doSpin_selectors": [],
+    }
     audits = [observe_spin(x["screen"], sets, width, height)
               for x in spins if isinstance(x["screen"], str) and len(x["screen"]) <= 300]
     symbol = latest.get("symbol")
@@ -247,6 +269,9 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "direct_model_duplicates_removed": direct["duplicated_across_sets"],
         "client_evidence_status": client["scene"]["status"],
         "client_server_result_visual_stop_evidence": client["conclusions"]["server_result_drives_visual_stop_evidence"],
+        "initial_reel_set_status": selector_evidence["status"],
+        "initial_reel_set": selector_evidence["current_reel_set"],
+        "initial_direct_screen_count": selector_evidence["current_set_direct_model_unique_screens"],
         "animation_protocol_origin": animation["interpretation"],
         "animation_server_selector_observed_in_capture": [
             k for k, v in animation["protocol_fields"].items()
@@ -263,6 +288,7 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     write_json(out / "direct_model.json", direct)
     write_json(out / "client_evidence.json", client)
     write_json(out / "animation_origin_trace.json", animation)
+    write_json(out / "reel_set_selector_evidence.json", selector_evidence)
     write_json(out / "assets_index.json", static_assets)
     write_json(out / "historical_audit.json", audits)
     # HAR depurado y reducido: solo doInit y claves públicas conocidas.
@@ -294,6 +320,10 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "Pantallas únicas en modelo directo: " + str(direct["union_unique_screen_count"]),
         "Duplicados entre conjuntos: " + str(direct["duplicated_across_sets"]),
         "Escena del cliente: " + client["scene"]["status"],
+        "Selector inicial reel_set: " + str(selector_evidence["current_reel_set"])
+        + " [" + selector_evidence["status"] + "]",
+        "Pantallas modelo directo para reel_set inicial: "
+        + str(selector_evidence["current_set_direct_model_unique_screens"]),
         "Origen de símbolos (estático): " + animation["interpretation"],
         "Selectores observados en la captura: " + ", ".join(summary["animation_server_selector_observed_in_capture"]),
         "Evidencia de parada visual desde resultado del servidor: " + client["conclusions"]["server_result_drives_visual_stop_evidence"],
