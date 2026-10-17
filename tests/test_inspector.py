@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 from inspector.capture import permitted_url, should_allow_request
 from inspector.core import analyze_har, circular_windows, observe_spin, parse_paytable
 from inspector.direct_model import compute_direct_model, check_screen
+from inspector.client_evidence import inspect_client_har
 
 
 def record(action, response, symbol="vs10sample"):
@@ -108,9 +109,93 @@ class InspectorTests(unittest.TestCase):
             self.assertNotIn("token", txt)
             self.assertEqual(len(json.loads(txt)["log"]["entries"]), 1)
             for filename in ("report.md", "summary.json", "assets_index.json",
-                             "paytable.json", "historical_audit.json", "direct_model.json"):
+                             "paytable.json", "historical_audit.json", "direct_model.json", "client_evidence.json"):
                 self.assertTrue((out / filename).exists(), filename)
 
+
+
+    def test_client_source_and_scene_are_separated_from_server_rng(self):
+        root = {
+            "resources": [{"type": "GameObject", "data": {"root": [
+                {"name": "ServerConnector", "components": [{
+                    "componentType": "RequestProvider",
+                    "serializableData": {"offlineServer": None}}]},
+                {"name": "ReelsManager", "components": [{
+                    "componentType": "VS_ReelsManager",
+                    "serializableData": {"stopOnScreenSymbols": True}}]},
+                {"name": "Symbols", "components": [{
+                    "componentType": "V4ServerAdapter_Symbols",
+                    "serializableData": {"screenSymbolsKeys": ["S", "X", "W"]}}]},
+                {"name": "WinLines", "components": [{
+                    "componentType": "VS_LinesDefinitions",
+                    "serializableData": {"xtEnabled": [
+                        {"nestedFieldType": "LineInfo",
+                         "serializableData": {"symbolIndices": [0, 1, 2]}}
+                    ]}}]},
+            ]}}]
+        }
+        blob = json.dumps(root)
+        pivot = len(blob) // 2
+        code = (
+            "VS_Reel.prototype.GetNextSymbol=function(){"
+            "if(this.reelsManager.stopOnScreenSymbols){"
+            "this.GetReelScreenSymbols(XT.GetObject(Vars.ResultScreenSymbols));"
+            "}else{this.stopPosition--;x=this.symbolList[pos%this.symbolList.length];}};"
+            "OfflineServer.prototype.Start=function(){};"
+            "RequestProvider.prototype.NewRequest=function(){"
+            "return ServerOptions.isOnline?a:b};"
+            "VSProtocolParser.ParseWinScreenSymbols();"
+            "PRIVATE_TOKEN_NOT_FOR_EXPORT"
+        )
+        def asset(filename, text):
+            return {
+                "request": {"method": "GET",
+                            "url": ("https://demogamesfree.pragmaticplay.net"
+                                    "/gs2c/common/v3/games-html5/games/vs/"
+                                    "vs10sample/desktop/" + filename)},
+                "response": {"status": 200, "content": {"text": text}}
+            }
+        events = [
+            asset("build.js", code),
+            asset("game/game000.json", blob[:pivot]),
+            asset("game/game001.json", blob[pivot:]),
+            asset("game/game002.json", "{}"),  # substituido abajo: no usar fragmento extra
+        ][:3]
+        with tempfile.TemporaryDirectory() as td:
+            har = Path(td) / "input.har"
+            har.write_text(json.dumps({"log": {"entries": events}}), encoding="utf-8")
+            analysis = inspect_client_har(har, "vs10sample")
+            self.assertEqual(analysis["scene"]["status"], "PARSED")
+            self.assertTrue(analysis["scene"]["reel_stop_uses_response_symbols"])
+            self.assertEqual(analysis["scene"]["offline_server_attachment"], "NULL")
+            self.assertEqual(analysis["scene"]["line_paths_declarative"], [[0,1,2]])
+            self.assertEqual(analysis["scene"]["screen_symbol_keys"], ["S","X","W"])
+            self.assertTrue(analysis["client_code"]["proofs"][
+                "stopping_branch_reads_result_screen_symbols"])
+            self.assertTrue(analysis["client_code"]["proofs"][
+                "alternative_branch_reads_visual_symbol_list"])
+            self.assertEqual(analysis["conclusions"][
+                "server_result_drives_visual_stop_evidence"], "STRONG_CLIENT_EVIDENCE")
+            self.assertFalse(analysis["conclusions"]["complete_server_outcome_rules_recovered"])
+            self.assertNotIn("PRIVATE_TOKEN_NOT_FOR_EXPORT", json.dumps(analysis))
+            self.assertEqual(analysis["conclusions"]["global_allowed_or_forbidden_spin_set"],
+                             "UNKNOWN")
+
+    def test_scene_must_be_complete_not_silently_invented(self):
+        entry = {
+            "request": {"method": "GET",
+                        "url": ("https://demogamesfree.pragmaticplay.net"
+                                "/gs2c/common/v3/games-html5/games/vs/"
+                                "vs10sample/desktop/game/game001.json")},
+            "response": {"status": 200, "content": {"text": "{}"}}
+        }
+        with tempfile.TemporaryDirectory() as td:
+            har = Path(td) / "partial.har"
+            har.write_text(json.dumps({"log":{"entries":[entry]}}), encoding="utf-8")
+            analysis = inspect_client_har(har, "vs10sample")
+            self.assertEqual(analysis["scene"]["status"], "INCOMPLETE_PARTS")
+            self.assertEqual(analysis["conclusions"][
+                "server_result_drives_visual_stop_evidence"], "INCOMPLETE")
 
     def test_direct_union_exact_with_overlap(self):
         def strip(seq):
