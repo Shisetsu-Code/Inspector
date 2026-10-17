@@ -187,3 +187,66 @@ def evaluate_literal_line(contract: dict, symbols: str) -> dict:
         "feature_bonus_status": "UNKNOWN",
     })
     return row
+
+
+
+def evaluate_declared_bonus(contract: dict, *,
+                            money_symbol_count: int,
+                            collect_on_reel_5: bool,
+                            collect_plus_one: bool = False) -> dict:
+    """Evalúa condiciones declaradas en ficha oficial, sin afirmar cobro server.
+
+    Se reciben cantidades semánticas de money symbols y presencia de Collect en
+    la 5ª columna; su correspondencia con IDs de s se desconoce y no se inventa.
+    """
+    if not isinstance(money_symbol_count, int) or not 0 <= money_symbol_count <= 50:
+        raise ValueError("money_symbol_count inválido")
+    if not isinstance(collect_on_reel_5, bool) or not isinstance(collect_plus_one, bool):
+        raise ValueError("collect_on_reel_5 y collect_plus_one deben ser booleanos")
+
+    declared = contract.get("official_description_feature_rules") or {}
+    bonus = declared.get("bonus_trigger")
+    extra = declared.get("extra_spin")
+    if declared.get("status") != "PUBLIC_DESCRIPTION_CONDITION_PARSED" or not isinstance(bonus, dict):
+        return {
+            "status": "CONTRACT_UNKNOWN",
+            "source": "PUBLIC_OFFICIAL_GAME_DESCRIPTION",
+            "bonus_trigger_declared_match": None,
+            "predicted_initial_free_spins": None,
+            "server_feature_activation_verified": False,
+            "server_outcome_validity": "UNKNOWN",
+        }
+    threshold = bonus.get("minimum_money_symbols")
+    reel = bonus.get("collect_symbol_reel")
+    if not isinstance(threshold, int) or reel != 5:
+        return {
+            "status": "CONTRACT_UNKNOWN",
+            "source": "PUBLIC_OFFICIAL_GAME_DESCRIPTION",
+            "bonus_trigger_declared_match": None,
+            "predicted_initial_free_spins": None,
+            "server_feature_activation_verified": False,
+            "server_outcome_validity": "UNKNOWN",
+        }
+    meets_rule = money_symbol_count >= threshold and collect_on_reel_5
+    extra_spin = (
+        meets_rule and collect_plus_one and
+        bool((extra or {}).get("collect_plus_one_can_add_one_spin")))
+    return {
+        "status": "DECLARED_RULE_MATCH" if meets_rule else "DECLARED_RULE_NOT_MET",
+        "money_symbols": money_symbol_count,
+        "required_money_symbols": threshold,
+        "collect_on_reel_5": collect_on_reel_5,
+        "collect_plus_one": collect_plus_one,
+        "bonus_trigger_declared_match": meets_rule,
+        "predicted_initial_free_spins": (
+            bonus["awarded_free_spins"] + int(extra_spin) if meets_rule else 0),
+        "cash_payout_from_symbols": "UNKNOWN_WITHOUT_VALUES_AND_MULTIPLIER",
+        "source": "PUBLIC_OFFICIAL_GAME_DESCRIPTION",
+        "server_feature_activation_verified": False,
+        "server_outcome_validity": "UNKNOWN",
+        "assumptions": [
+            "Los conteos representan MONEY SYMBOLS, no cualquier símbolo coincidente",
+            "Collect está presente en el carrete cinco",
+            "La descripción pública está completa para esta condición",
+        ],
+    }
