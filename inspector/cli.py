@@ -8,6 +8,7 @@ import tempfile
 from .core import analyze_har
 from .capture import capture_official_demo
 from .direct_model import check_screen
+from .payment_contract import evaluate_symbol_count, evaluate_literal_line
 
 
 def main(argv=None) -> int:
@@ -28,8 +29,21 @@ def main(argv=None) -> int:
     k = sub.add_parser("check", help="Comprobar pantalla contra ventanas directas")
     k.add_argument("result_folder", type=Path)
     k.add_argument("screen", help="Cadena row-major o column-major de ancho x alto")
+    p = sub.add_parser("pay-count", help="Consultar entrada de paytable por símbolo y cantidad")
+    p.add_argument("result_folder", type=Path)
+    p.add_argument("symbol")
+    p.add_argument("count", type=int)
+    l = sub.add_parser("pay-line", help="Simular prefijo literal de línea, NO cobro real")
+    l.add_argument("result_folder", type=Path)
+    l.add_argument("symbols")
     args = parser.parse_args(argv)
     try:
+        if args.command in {"pay-count", "pay-line"}:
+            contract = json.loads((args.result_folder / "payment_contract.json").read_text(encoding="utf-8"))
+            result = (evaluate_symbol_count(contract, args.symbol, args.count)
+                      if args.command == "pay-count" else evaluate_literal_line(contract, args.symbols))
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
         if args.command == "check":
             model = json.loads((args.result_folder / "reel_rules.json").read_text(encoding="utf-8"))
             summary = json.loads((args.result_folder / "summary.json").read_text(encoding="utf-8"))
