@@ -264,6 +264,7 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     }
     client = inspect_client_har(src, symbol, observed_wire_keys=observed)
     animation = client["animation_origin_trace"]
+    win_delivery = client["win_delivery_trace"]
     from .line_evaluator import extract_line_contract
     line_contract = extract_line_contract(client["scene"], width, height)
     from .payment_contract import build_payment_contract
@@ -367,6 +368,8 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "initial_reel_set": selector_evidence["current_reel_set"],
         "initial_direct_screen_count": selector_evidence["current_set_direct_model_unique_screens"],
         "animation_protocol_origin": animation["interpretation"],
+        "client_win_amount_and_positions_parser_present": win_delivery["server_may_send_winning_amount_and_positions"],
+        "client_highlighter_for_received_positions_present": win_delivery["client_can_visualize_received_win_positions"],
         "animation_server_selector_observed_in_capture": [
             k for k, v in animation["protocol_fields"].items()
             if v["status"] == "OBSERVED_IN_CAPTURE"
@@ -387,6 +390,7 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     write_json(out / "direct_model.json", direct)
     write_json(out / "client_evidence.json", client)
     write_json(out / "animation_origin_trace.json", animation)
+    write_json(out / "win_delivery_trace.json", win_delivery)
     write_json(out / "reel_set_selector_evidence.json", selector_evidence)
     write_json(out / "assets_index.json", static_assets)
     write_json(out / "historical_audit.json", audits)
@@ -429,6 +433,8 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "Pantallas modelo directo para reel_set inicial: "
         + str(selector_evidence["current_set_direct_model_unique_screens"]),
         "Origen de símbolos (estático): " + animation["interpretation"],
+        "Parser de importes y posiciones de premio: " + str(win_delivery["server_may_send_winning_amount_and_positions"]),
+        "Resaltado gráfico de posiciones recibidas: " + str(win_delivery["client_can_visualize_received_win_positions"]),
         "Selectores observados en la captura: " + ", ".join(summary["animation_server_selector_observed_in_capture"]),
         "Evidencia de parada visual desde resultado del servidor: " + client["conclusions"]["server_result_drives_visual_stop_evidence"],
         "Simulador local acoplado a escena: " + str(client["scene"]["offline_server_attachment"]),

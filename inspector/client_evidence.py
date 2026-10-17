@@ -241,6 +241,8 @@ def inspect_client_har(har_path: str | Path, game_symbol: str | None = None,
     code, scene = _inspect_source(build), _scene_components(parts)
     from .animation_trace import analyze_animation_origin
     animation = analyze_animation_origin(build, scene, observed_wire_keys)
+    from .win_delivery import inspect_win_delivery
+    win_delivery = inspect_win_delivery(build)
     source_branch = code["proofs"].get("stopping_branch_reads_result_screen_symbols") is True
     scene_stop = scene["reel_stop_uses_response_symbols"] is True
     offline_detached = scene["offline_server_attachment"] == "NULL"
@@ -251,6 +253,7 @@ def inspect_client_har(har_path: str | Path, game_symbol: str | None = None,
         "client_code": code,
         "scene": scene,
         "animation_origin_trace": animation,
+        "win_delivery_trace": win_delivery,
         "conclusions": {
             "client_has_server_result_symbol_stop_path": source_branch,
             "captured_scene_activates_result_symbol_stops": scene_stop,
