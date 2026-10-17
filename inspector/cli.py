@@ -9,6 +9,7 @@ from .core import analyze_har
 from .capture import capture_official_demo
 from .direct_model import check_screen
 from .payment_contract import evaluate_symbol_count, evaluate_literal_line, evaluate_declared_bonus
+from .line_evaluator import evaluate_literal_screen
 from .screen_evaluator import evaluate_screen_literals
 
 
@@ -47,6 +48,9 @@ def main(argv=None) -> int:
     e = sub.add_parser("screen-pay", help="Condiciones literales por líneas de escena; NO cobro real")
     e.add_argument("result_folder", type=Path)
     e.add_argument("screen", help="Pantalla en orden de filas, ancho × alto símbolos")
+    s = sub.add_parser("evaluate-screen", help="Premios literales condicionados a líneas explícitas")
+    s.add_argument("result_folder", type=Path)
+    s.add_argument("screen", help="Cadena de símbolos codificados, no valores monetarios")
     args = parser.parse_args(argv)
     try:
         if args.command == "screen-pay":
@@ -57,6 +61,13 @@ def main(argv=None) -> int:
             result = evaluate_screen_literals(
                 args.screen, contract, evidence,
                 summary["geometry"]["width"], summary["geometry"]["height"])
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+        if args.command == "evaluate-screen":
+            folder = args.result_folder
+            lines = json.loads((folder / "line_geometry.json").read_text(encoding="utf-8"))
+            payment = json.loads((folder / "payment_contract.json").read_text(encoding="utf-8"))
+            result = evaluate_literal_screen(args.screen, lines, payment)
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0
         if args.command == "bonus-check":
