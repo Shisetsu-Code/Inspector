@@ -44,6 +44,21 @@ El job tests comprueba extracción, ventanas circulares y ocultación de credenc
 
 En cada ejecución, descargar el artefacto inspector-resultados-depurados. No se publica un HAR de sesión: se genera sanitized-init.har, un subconjunto reproducible de doInit con las claves reel_set*, paytable y geometría. Los activos JavaScript propietarios no se cargan como artefactos, pero su existencia y hashes quedan registrados.
 
+### Clasificación exacta del modelo de paradas directas
+
+Después de la captura, Inspector calcula la unión de pantallas de todos los reel_set completos sin generar combinaciones una por una. Se publica como \`direct_model.json\` (conteos, duplicados y distribución de cantidad de símbolos \`S\`); el modelo **no es el RNG real**.
+
+Para comprobar una pantalla desde Windows, abrí la GUI, analizá un HAR, introducí una cadena de símbolos de longitud \`sw × sh\` y pulsá **Comprobar pantalla**. El mensaje diferencia \`MATCH\` de \`NOT_IN_DIRECT_MODEL\` y siempre conserva \`server_outcome_validity=UNKNOWN\`.
+
+Desde consola:
+
+    py -3 -m inspector.cli check "resultado" "943bb39531a1S7452883"
+
+El ejemplo corresponde a Deep Sea Frenzy (5×4) y a una pantalla de parada directa reconstruida de \`reel_set0\`. No es una tirada real registrada.
+
+Detalles matemáticos y verificación: [Modelo de paradas directas](docs/MODELO_DIRECTO.md).
+
+
 ### Archivos de resultados
 
 | Archivo | Significado |
@@ -52,6 +67,8 @@ En cada ejecución, descargar el artefacto inspector-resultados-depurados. No se
 | reel_rules.json | Tiras, alfabetos y ventanas circulares exactas (longitud 1–4) |
 | paytable.json | Tabla de pagos declarada por el juego |
 | historical_audit.json | Comparación de giros capturados con el modelo directo |
+| direct_model.json | Unión exacta de pantallas de paradas directas y distribución por cantidad de símbolos S |
+| sample_screen_check.json | Pantalla testigo generada desde las tiras y validación del contrato en Actions |
 | assets_index.json | SHA256, tamaño e indicadores de scripts, sin código propietario |
 | sanitized-init.har | HAR reducido solo a parámetros públicos de inicialización |
 | report.md | Diagnóstico resumido |

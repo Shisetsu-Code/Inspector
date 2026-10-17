@@ -14,6 +14,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: inspector-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   tests:
     runs-on: ubuntu-latest
@@ -49,6 +53,35 @@ jobs:
         run: |
           set -o pipefail
           python -m inspector.cli capture "$INSPECTOR_GAME_URL" --seconds 75 --out run-results --require-init | tee capture.log
+
+      - name: Comprobar testigo del modelo directo
+        if: steps.analysis.outcome == 'success'
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from inspector.direct_model import check_screen
+          target = Path("run-results")
+          d = json.loads((target / "reel_rules.json").read_text(encoding="utf-8"))
+          summary = json.loads((target / "summary.json").read_text(encoding="utf-8"))
+          width = summary["geometry"]["width"]
+          height = summary["geometry"]["height"]
+          if not d["sets"] or width < 1 or height < 1:
+              raise RuntimeError("Sin tiras o geometría suficiente para comprobación")
+          first = next((reels for reels in d["sets"].values()
+                        if len(reels) == width and all(len(r["sequence"]) >= height for r in reels)), None)
+          if first is None:
+              raise RuntimeError("No existe un reel_set completo con tiras suficientes")
+          columns = [r["sequence"][:height] for r in first]
+          screen = "".join(columns[c][y] for y in range(height) for c in range(width))
+          result = check_screen(d["sets"], width, height, screen)
+          assert result["direct_model_compatible"] is True
+          assert result["server_outcome_validity"] == "UNKNOWN"
+          (target / "sample_screen_check.json").write_text(
+              json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+          print("Pantalla testigo de parada directa:", screen)
+          print("Comprobada contra reel_set:", result["matching_sets_and_orientations"])
+          PY
       - name: Publicar informe en resumen de GitHub
         if: always()
         run: |

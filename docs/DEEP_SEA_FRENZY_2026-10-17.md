@@ -50,3 +50,25 @@ El modelo de paradas circulares directas, de altura 4, devuelve cantidades por c
 Incluye `reel_rules.json`, `paytable.json`, `summary.json`, `assets_index.json`, `capture_status.json`, `sanitized-init.har` y `report.md`. No publica cookies, HAR bruto ni el JavaScript propietario original.
 
 **Conclusión:** validada la captura autónoma de inicialización del juego `vs50frenzy` desde GitHub Actions, sin participación humana ni giros. Faltan los contratos del generador server-side para clasificar exhaustivamente tiradas finales.
+
+
+## Ampliación verificada: unión exacta del modelo directo
+
+La siguiente cifra fue calculada con las tiras de los cinco reel_set de la captura. Cada carrete aporta las ventanas circulares **distintas** de cuatro símbolos. El número de pantallas distintas de un conjunto es el producto de las opciones de sus cinco carretes. Las duplicadas entre reel_set se descuentan mediante inclusión-exclusión de intersecciones.
+
+| Conjunto | Ventanas distintas por carrete | Pantallas distintas |
+| --- | --- | ---: |
+| reel_set0 | 85, 51, 74, 73, 53 | 1.241.136.510 |
+| reel_set1 | 84, 75, 70, 52, 53 | 1.215.396.000 |
+| reel_set2 | 94, 58, 83, 44, 64 | 1.274.285.056 |
+| reel_set3 | 76, 75, 73, 40, 54 | 898.776.000 |
+| reel_set4 | 90, 79, 63, 52, 76 | 1.770.219.360 |
+| **Suma con duplicados** | — | **6.399.812.926** |
+| **Duplicados entre conjuntos** | — | **2.080** |
+| **Unión sin duplicados** | — | **6.399.810.846** |
+
+Un testigo sintético reproducible del conjunto 0, ordenado por filas: \`943bb39531a1S7452883\`. Su compatibilidad con ventanas directas no implica que sea una tirada autorizada por el backend.
+
+El histograma exacto de cantidad de \`S\` se exporta en \`direct_model.json\`, sin pesos ni frecuencias. Las ventanas extraídas de las tiras no contienen \`S\` en el quinto carrete. Estas restricciones son válidas **dentro del modelo directo sin transformaciones**; no constituyen prohibiciones globales para los resultados del servidor.
+
+La nueva herramienta permite comprobar una pantalla de 20 símbolos desde la GUI o con el comando \`python -m inspector.cli check <carpeta> <pantalla>\`.
