@@ -79,6 +79,7 @@ class InspectorTests(unittest.TestCase):
                 "reel_set0": "abc~def~ghi~jkl~mno",
                 "reel_set1": "abc~def~ghi~jkl~mno",
                 "sw": "5", "sh": "3", "st": "rect", "paytable": "a~3:5",
+                "reel_set": "1",
                 "token": "SENSITIVE_SECRET_VALUE",
             }),
             record("doSpin", {"s": "adgjmbehkncfilo", "w": "100"}),
@@ -100,16 +101,23 @@ class InspectorTests(unittest.TestCase):
             self.assertEqual(summary["historical_spins"], 1)
             self.assertEqual(summary["reel_set_count"], 2)
             self.assertEqual(summary["reel_strip_count"], 10)
+            self.assertEqual(summary["initial_reel_set_status"], "DECLARED_AND_PRESENT_IN_INIT_SETS")
+            self.assertEqual(summary["initial_reel_set"], "1")
+            self.assertIsInstance(summary["initial_direct_screen_count"], int)
             self.assertTrue(summary["has_build_js"])
             self.assertFalse(summary["complete_server_math_known"])
             self.assertEqual(summary["extractor_spins_sent"], 0)
             txt = (out / "sanitized-init.har").read_text(encoding="utf-8")
             self.assertNotIn("SENSITIVE_SECRET_VALUE", txt)
+            selector = json.loads((out / "reel_set_selector_evidence.json").read_text())
+            self.assertFalse(selector["future_set_transition_inferred"])
+            self.assertFalse(selector["global_server_mathematics_known"])
             self.assertNotIn("doSpin", txt)
             self.assertNotIn("token", txt)
             self.assertEqual(len(json.loads(txt)["log"]["entries"]), 1)
             for filename in ("report.md", "summary.json", "assets_index.json",
-                             "paytable.json", "historical_audit.json", "direct_model.json", "client_evidence.json"):
+                             "paytable.json", "historical_audit.json", "direct_model.json", "client_evidence.json",
+                             "animation_origin_trace.json", "reel_set_selector_evidence.json"):
                 self.assertTrue((out / filename).exists(), filename)
 
 
