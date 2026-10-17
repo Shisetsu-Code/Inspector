@@ -68,6 +68,8 @@ Detalles matemáticos y verificación: [Modelo de paradas directas](docs/MODELO_
 | paytable.json | Tabla de pagos declarada por el juego |
 | historical_audit.json | Comparación de giros capturados con el modelo directo |
 | direct_model.json | Unión exacta de pantallas de paradas directas y distribución por cantidad de símbolos S |
+| payment_contract.json | Tabla y mínimos declarados, sin validar cobro real |
+| official_feature_rules.json | Condiciones detectadas en la ficha oficial, distintas de doInit |
 | client_evidence.json | Firmas estáticas de `build.js`, componentes de escena y sus límites; no se extrae el RNG del servidor |
 | sample_screen_check.json | Pantalla testigo generada desde las tiras y validación del contrato en Actions |
 | assets_index.json | SHA256, tamaño e indicadores de scripts, sin código propietario |
@@ -110,3 +112,19 @@ Detalles técnicos: [Animaciones, protocolo y origen de los resultados](docs/ANI
 
 
 **Última comprobación automatizada:** [Deep Sea Frenzy — animación, selectores y modelo directo](docs/DEEP_SEA_ANIMACION_SELECTOR_2026-10-17.md).
+
+## Evaluación local de pagos y bonus
+
+Inspector extrae también `payment_contract.json` y `official_feature_rules.json`, distinguiendo **paytable de doInit** de **condiciones que publica la ficha oficial**.
+
+Para consultar Deep Sea Frenzy:
+
+    py -3 -m inspector.cli pay-count resultado 1 2
+    py -3 -m inspector.cli pay-count resultado 4 2
+    py -3 -m inspector.cli pay-count resultado 4 3
+    py -3 -m inspector.cli bonus-check resultado 8 --collect-reel5
+    py -3 -m inspector.cli bonus-check resultado 8 --collect-reel5 --plus-one
+
+La GUI incluye controles equivalentes. No se envía ninguna tirada: los escenarios se evalúan sobre declaraciones recuperadas. Que exista una entrada en paytable no significa que una pantalla cualquiera sea ganadora; el cliente puede mostrar premios devueltos por el servidor sin recalcular su matemática.
+
+[Informe verificado de pagos y bonus de Deep Sea Frenzy](docs/DEEP_SEA_PAGOS_Y_BONUS_2026-10-17.md).
