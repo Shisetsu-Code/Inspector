@@ -5,6 +5,7 @@ from inspector.official_rules import extract_official_feature_rules
 from inspector.payment_contract import (
     build_payment_contract, evaluate_literal_line, evaluate_symbol_count,
     extract_scatter_declarations,
+    evaluate_declared_bonus,
 )
 
 
@@ -81,6 +82,43 @@ class PaymentContractTests(unittest.TestCase):
         rules = extract_official_feature_rules(doc,game_slug="wild-depths")
         self.assertEqual(rules["status"],"NOT_RECOGNIZED")
         self.assertIsNone(rules["bonus_trigger"])
+
+
+    def test_feature_count_seven_eight_and_plus_one(self):
+        html = """<h1>Deep Sea Frenzy</h1>
+        <p>Shark money symbols can land on reels 1-4. Collect symbols
+        can hit on reel five. When eight or more money symbols land on
+        the same spin as a collect symbol, their combined value is
+        boosted by any multiplier and awarded before the bonus game
+        triggers with five free spins. The +1 Spin collect symbol adds
+        an extra spin.</p>"""
+        rules = extract_official_feature_rules(html,game_slug="deep-sea-frenzy")
+        contract = {**self.contract,"official_description_feature_rules":rules}
+        no_trigger = evaluate_declared_bonus(
+            contract, money_symbol_count=7, collect_on_reel_5=True)
+        self.assertEqual(no_trigger["status"],"DECLARED_RULE_NOT_MET")
+        self.assertEqual(no_trigger["predicted_initial_free_spins"],0)
+        no_collect = evaluate_declared_bonus(
+            contract, money_symbol_count=8, collect_on_reel_5=False)
+        self.assertFalse(no_collect["bonus_trigger_declared_match"])
+        trigger = evaluate_declared_bonus(
+            contract, money_symbol_count=8, collect_on_reel_5=True)
+        self.assertTrue(trigger["bonus_trigger_declared_match"])
+        self.assertEqual(trigger["predicted_initial_free_spins"],5)
+        plus_one = evaluate_declared_bonus(
+            contract, money_symbol_count=8, collect_on_reel_5=True, collect_plus_one=True)
+        self.assertEqual(plus_one["predicted_initial_free_spins"],6)
+        self.assertFalse(plus_one["server_feature_activation_verified"])
+        self.assertEqual(plus_one["server_outcome_validity"],"UNKNOWN")
+
+    def test_feature_not_known_from_paytable_alone(self):
+        missing = evaluate_declared_bonus(
+            self.contract, money_symbol_count=8, collect_on_reel_5=True)
+        self.assertEqual(missing["status"],"CONTRACT_UNKNOWN")
+        self.assertIsNone(missing["predicted_initial_free_spins"])
+        with self.assertRaises(ValueError):
+            evaluate_declared_bonus(self.contract,money_symbol_count=-2,
+                                    collect_on_reel_5=True)
 
     def test_scatter_parser_preserves_no_proof_of_activation(self):
         scatter = extract_scatter_declarations("12~0,0,10,20~0,0,10,15~1,1,2,2")
