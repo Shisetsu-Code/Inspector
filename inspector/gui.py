@@ -99,6 +99,12 @@ def main() -> None:
             count = info.get("direct_model_union_unique_screen_count")
             if count is not None:
                 append("Pantallas únicas en paradas directas: {:,}".format(count).replace(",", "."))
+            evidence = info.get("client_server_result_visual_stop_evidence", "INCOMPLETE")
+            append("Evidencia del cliente (render de respuesta): " + evidence)
+            scene = info.get("client_evidence_status", "NOT_CAPTURED")
+            append("Escena del cliente: " + scene)
+            if scene == "PARSED":
+                append("Detalles en client_evidence.json")
             append("Validez matemática global del servidor: DESCONOCIDA")
             append("Archivos guardados: " + str(value[0]))
 
