@@ -31,6 +31,32 @@ def permitted_url(url: str) -> bool:
             and "gameSymbol=" in p.query)
 
 
+def should_allow_request(request) -> bool:
+    """Permite GET/HEAD y el doInit oficial; no lee POST binarios de terceros.
+
+    Algunos CDNs y sistemas de telemetría hacen POST con bytes no UTF-8.
+    La propiedad post_data de Playwright lanza UnicodeDecodeError al intentar
+    decodificarlos. Por eso solo se inspecciona ese cuerpo tras validar host,
+    ruta y método.
+    """
+    method = request.method.upper()
+    if method in {"GET", "HEAD"}:
+        return True
+    if method != "POST":
+        return False
+    try:
+        parsed = urlsplit(request.url)
+    except ValueError:
+        return False
+    if parsed.scheme != "https" or parsed.hostname != DEMO or not GAME_ACTION.search(parsed.path):
+        return False
+    try:
+        body = dict(parse_qsl(request.post_data or "", keep_blank_values=True))
+    except (UnicodeError, ValueError, TypeError):
+        return False
+    return body.get("action") == "doInit"
+
+
 def capture_official_demo(url: str, har_file: str | Path,
                           *, duration_s: int = 70, headless: bool = True) -> dict:
     if not permitted_url(url):
@@ -56,20 +82,11 @@ def capture_official_demo(url: str, har_file: str | Path,
             record_har_mode="full",
         )
         def restrict(route):
-            request = route.request
-            method = request.method.upper()
-            if method in {"GET", "HEAD"}:
+            if should_allow_request(route.request):
                 route.continue_()
-                return
-            parsed = urlsplit(request.url)
-            body = dict(parse_qsl(request.post_data or "", keep_blank_values=True))
-            action = body.get("action")
-            if (method == "POST" and parsed.hostname == DEMO and
-                    GAME_ACTION.search(parsed.path) and action == "doInit"):
-                route.continue_()
-                return
-            report["blocked_mutations"] += 1
-            route.abort()
+            else:
+                report["blocked_mutations"] += 1
+                route.abort()
 
         context.route("**/*", restrict)
 
@@ -79,7 +96,7 @@ def capture_official_demo(url: str, har_file: str | Path,
                 p = urlsplit(response.url)
                 if (req.method == "POST" and p.hostname == DEMO
                         and GAME_ACTION.search(p.path)
-                        and dict(parse_qsl(req.post_data or "")).get("action") == "doInit"
+                        and should_allow_request(req)
                         and response.status == 200):
                     report["init_observed"] += 1
             except Exception:
