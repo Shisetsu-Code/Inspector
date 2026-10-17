@@ -302,9 +302,11 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     pay_contract["declared_line_paths"] = [
         row["positions_row_major"] for row in line_scene["lines_recovered"]
     ]
-    pay_contract["payline_geometry_complete"] = bool(
-        line_scene["complete_all_active_paylines_known"]
+    pay_contract["scene_declared_line_paths_recovered"] = bool(
+        line_scene["complete_declared_scene_paths_recovered"]
     )
+    pay_contract["payline_geometry_complete"] = False
+    pay_contract["active_line_set_verified"] = False
     pay_contract["bet_denominator_known"] = False
     summary = {
         "schema": SCHEMA, "game_symbol": symbol,
