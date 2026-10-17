@@ -88,6 +88,17 @@ Más detalles: [Arquitectura](docs/ARCHITECTURA.md) · [Operación](docs/OPERACI
 
 [Inspección del cliente de Deep Sea Frenzy](docs/DEEP_SEA_CLIENTE_EVIDENCIA_2026-10-17.md): analiza `GetNextSymbol`, `stopOnScreenSymbols`, el simulador offline y la diferencia entre renderizado y generación de resultados.
 
+
+## Investigar las animaciones y el origen del resultado
+
+Inspector también inspecciona estáticamente `build.js` y los componentes de la escena para separar **paradas visuales**, **parsing del protocolo** y **generación del servidor**. El archivo `animation_origin_trace.json` contiene un inventario acotado de funciones y campos encontrados sin publicar código propietario.
+
+Se comprueba la existencia de los campos `reel_set` (conjunto actual), `n_reel_set` (selector siguiente), `srf` (sustituciones), `tmb` (cascadas) y `n_rsl` (símbolos siguientes). Cada uno se clasifica por separado como `OBSERVED_IN_CAPTURE`, `CLIENT_KNOWS_FIELD_ONLY` o `NOT_CONFIRMED`. La mera presencia en el JavaScript no prueba que la función se active en el juego.
+
+Un uso de `Math.random()` en animaciones o simulaciones offline **no demuestra** que el cliente decida los resultados reales. La conclusión global es `UNKNOWN` si no se dispone de la matemática completa del servidor.
+
+Detalles técnicos: [Animaciones, protocolo y origen de los resultados](docs/ANIMACION_Y_MATEMATICA.md).
+
 ## Organización del proyecto
 
 - inspector/core.py — lectura y normalización offline.
