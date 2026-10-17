@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from urllib.parse import urlencode
 
-from inspector.capture import permitted_url
+from inspector.capture import permitted_url, should_allow_request
 from inspector.core import analyze_har, circular_windows, observe_spin, parse_paytable
 from inspector.direct_model import compute_direct_model, check_screen
 
@@ -47,6 +47,30 @@ class InspectorTests(unittest.TestCase):
         self.assertFalse(permitted_url("https://evil.example/play"))
         self.assertFalse(permitted_url(
             "https://demogamesfree.pragmaticplay.net/gs2c/ge/v5/gameService"))
+
+    def test_request_filter_never_decodes_binary_analytics_post(self):
+        class BinaryRequest:
+            method = "POST"
+            url = "https://analytics.example.org/collect"
+            @property
+            def post_data(self):
+                raise UnicodeDecodeError("utf-8", b"\xe4", 0, 1, "invalid byte")
+
+        class BinaryAtGameService(BinaryRequest):
+            url = "https://demogamesfree.pragmaticplay.net/gs2c/ge/v5/gameService"
+
+        class InitRequest:
+            method = "POST"
+            url = "https://demogamesfree.pragmaticplay.net/gs2c/ge/v5/gameService"
+            post_data = "action=doInit&symbol=vs50frenzy"
+
+        class SpinRequest(InitRequest):
+            post_data = "action=doSpin&symbol=vs50frenzy"
+
+        self.assertFalse(should_allow_request(BinaryRequest()))
+        self.assertFalse(should_allow_request(BinaryAtGameService()))
+        self.assertTrue(should_allow_request(InitRequest()))
+        self.assertFalse(should_allow_request(SpinRequest()))
 
     def test_har_analysis_and_redaction(self):
         events = [
