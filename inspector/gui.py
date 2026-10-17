@@ -1,4 +1,5 @@
 """Ventana de Windows/Tkinter: escoger HAR, analizar, consultar informe."""
+import json
 from pathlib import Path
 import threading
 import tkinter as tk
@@ -6,17 +7,19 @@ from tkinter import filedialog, messagebox, ttk
 import webbrowser
 
 from .core import analyze_har
+from .direct_model import check_screen
 
 
 def main() -> None:
     window = tk.Tk()
     window.title("Inspector — Pragmatic HAR")
-    window.geometry("730x430")
+    window.geometry("820x530")
     window.minsize(650, 365)
     selected = tk.StringVar()
     output = tk.StringVar(value=str(Path.home() / "Inspector_resultados"))
     status = tk.StringVar(value="Seleccioná un HAR para comenzar.")
     running = tk.BooleanVar(value=False)
+    screen_text = tk.StringVar()
     result_folder = [None]
 
     body = ttk.Frame(window, padding=18)
@@ -38,6 +41,34 @@ def main() -> None:
     progress = ttk.Progressbar(body, mode="indeterminate")
     progress.pack(fill="x")
     ttk.Label(body, textvariable=status).pack(anchor="w", pady=(8,8))
+    ttk.Label(body, text="Consultar pantalla (una letra/código por símbolo, en orden por filas o columnas)").pack(anchor="w", pady=(4,2))
+    qrow = ttk.Frame(body); qrow.pack(fill="x", pady=(0,8))
+    ttk.Entry(qrow, textvariable=screen_text).pack(side="left", fill="x", expand=True)
+    def query_screen():
+        if not result_folder[0]:
+            messagebox.showinfo("Inspector", "Primero analizá un HAR.")
+            return
+        try:
+            folder = result_folder[0]
+            rules = json.loads((folder / "reel_rules.json").read_text(encoding="utf-8"))
+            summary = json.loads((folder / "summary.json").read_text(encoding="utf-8"))
+            checked = check_screen(rules["sets"], summary["geometry"]["width"],
+                                   summary["geometry"]["height"], screen_text.get().strip())
+            result = ("COINCIDE con paradas directas" if checked["direct_model_compatible"]
+                      else "NO COINCIDE con paradas directas")
+            append(result + "; validez matemática global: DESCONOCIDA")
+            if checked["matching_sets_and_orientations"]:
+                append("Coincidencias: " + ", ".join(
+                    f"set {x['reel_set']} {x['orientation']}"
+                    for x in checked["matching_sets_and_orientations"]))
+            else:
+                for x in checked["closest_direct_model_matches"][:2]:
+                    append(f"Mejor aproximación: set {x['reel_set']} {x['orientation']} "
+                           f"{x['matching_reels']}/{x['total_reels']} carretes")
+        except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
+            messagebox.showerror("Consulta de pantalla", str(exc))
+    ttk.Button(qrow, text="Comprobar pantalla", command=query_screen).pack(side="left", padx=6)
+
     log = tk.Text(body, wrap="word", height=8)
     log.pack(fill="both", expand=True)
     log.insert("end", "Se extraen tiras, tabla de pagos, huellas de archivos y auditoría del modelo directo.\n")
@@ -65,6 +96,10 @@ def main() -> None:
             append("doInit: {} | conjuntos: {} | tiras: {} | assets: {}".format(
                 info["doInit_count"], info["reel_set_count"],
                 info["reel_strip_count"], info["assets_indexed"]))
+            count = info.get("direct_model_union_unique_screen_count")
+            if count is not None:
+                append("Pantallas únicas en paradas directas: {:,}".format(count).replace(",", "."))
+            append("Validez matemática global del servidor: DESCONOCIDA")
             append("Archivos guardados: " + str(value[0]))
 
     def start():
