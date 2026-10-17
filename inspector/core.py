@@ -250,6 +250,16 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     }
     client = inspect_client_har(src, symbol, observed_wire_keys=observed)
     animation = client["animation_origin_trace"]
+    from .payment_contract import build_payment_contract
+    pay_contract = build_payment_contract(
+        paytable,
+        scatter_data=response.get("scatters"),
+        line_paths=client["scene"].get("line_paths_declarative") or [],
+        client_methods=[
+            x["name"] for x in animation["parser_and_reel_methods"]
+            if isinstance(x, dict) and isinstance(x.get("name"), str)
+        ],
+    )
     summary = {
         "schema": SCHEMA, "game_symbol": symbol,
         "doInit_count": len(initializations), "historical_spins": len(spins),
@@ -259,6 +269,10 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "reel_strip_count": sum(len(x) for x in sets.values()),
         "geometry": {"width": width, "height": height, "type": response.get("st")},
         "paytable_symbols": len(paytable),
+        "paytable_two_symbol_paying_ids": pay_contract["symbols_with_2_count_payout"],
+        "paytable_three_symbol_paying_ids": pay_contract["symbols_with_3_count_payout"],
+        "scatter_declaration_status": pay_contract["scatter"]["status"],
+        "free_spins_trigger_verified": False,
         "complete_server_math_known": False,
         "final_outcome_universe_known": False,
         "forbidden_final_outcomes_proven": [],
@@ -285,6 +299,7 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "does_not_prove_final_outcome_impossibility": True,
     })
     write_json(out / "paytable.json", paytable)
+    write_json(out / "payment_contract.json", pay_contract)
     write_json(out / "direct_model.json", direct)
     write_json(out / "client_evidence.json", client)
     write_json(out / "animation_origin_trace.json", animation)
@@ -298,6 +313,11 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         r = init["response"]
         safe = {k: v for k, v in r.items()
                 if k in PUBLIC_INIT or REEL_NAME.fullmatch(k)}
+        # Solo exportar scatters en su gramática numérica validada, nunca tokens.
+        if pay_contract["scatter"]["status"] == "DECLARED_TABLE_PARSED":
+            from .payment_contract import SCATTER_RE
+            if "scatters" in r and SCATTER_RE.fullmatch(r["scatters"]):
+                safe["scatters"] = r["scatters"]
         safe_entries.append({
             "request": {"url": "https://" + DEMO_HOST + "/gs2c/ge/v5/gameService",
                         "method": "POST",
@@ -330,6 +350,12 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "Simulador local acoplado a escena: " + str(client["scene"]["offline_server_attachment"]),
         "Recursos estáticos indexados: " + str(len(static_assets)),
         "build.js observado: " + str(summary["has_build_js"]),
+        "Símbolos con premio declarado desde 2 coincidencias: "
+        + ", ".join(summary["paytable_two_symbol_paying_ids"]),
+        "Símbolos con premio declarado desde 3 coincidencias: "
+        + ", ".join(summary["paytable_three_symbol_paying_ids"]),
+        "Tabla scatter/free spins: " + summary["scatter_declaration_status"],
+        "Verificación completa del disparo de free spins: NO",
         "Giros enviados por Inspector: 0",
         "Giros históricos observados en el HAR: " + str(len(spins)),
         "",
