@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 
 from inspector.capture import permitted_url
 from inspector.core import analyze_har, circular_windows, observe_spin, parse_paytable
+from inspector.direct_model import compute_direct_model, check_screen
 
 
 def record(action, response, symbol="vs10sample"):
@@ -83,8 +84,42 @@ class InspectorTests(unittest.TestCase):
             self.assertNotIn("token", txt)
             self.assertEqual(len(json.loads(txt)["log"]["entries"]), 1)
             for filename in ("report.md", "summary.json", "assets_index.json",
-                             "paytable.json", "historical_audit.json"):
+                             "paytable.json", "historical_audit.json", "direct_model.json"):
                 self.assertTrue((out / filename).exists(), filename)
+
+
+    def test_direct_union_exact_with_overlap(self):
+        def strip(seq):
+            return {"sequence": seq}
+        reel_sets = {
+            "0": [strip("ab"), strip("cd")],
+            "1": [strip("abx"), strip("cdy")],
+        }
+        model = compute_direct_model(reel_sets, 2, 2)
+        self.assertTrue(model["valid_model"])
+        self.assertEqual(model["sets"]["0"]["unique_screen_count"], 4)
+        self.assertEqual(model["sets"]["1"]["unique_screen_count"], 9)
+        self.assertEqual(model["union_unique_screen_count"], 12)
+        self.assertEqual(model["duplicated_across_sets"], 1)
+        self.assertEqual(model["special_symbol_count_histogram"], {"0": 12})
+
+    def test_direct_screen_membership_does_not_prove_rng_validity(self):
+        reel_sets = {"0": [{"sequence": "ab"}, {"sequence": "cd"}]}
+        match = check_screen(reel_sets, 2, 2, "acbd")
+        self.assertTrue(match["direct_model_compatible"])
+        self.assertEqual(match["server_outcome_validity"], "UNKNOWN")
+        missing = check_screen(reel_sets, 2, 2, "zzzz")
+        self.assertFalse(missing["direct_model_compatible"])
+        self.assertEqual(missing["server_outcome_validity"], "UNKNOWN")
+        with self.assertRaises(ValueError):
+            check_screen(reel_sets, 2, 2, "abc")
+
+    def test_direct_special_symbol_count_histogram(self):
+        reels = {"0": [{"sequence": "SSab"}, {"sequence": "cd"}]}
+        d = compute_direct_model(reels, 2, 2)
+        self.assertEqual(d["union_unique_screen_count"], 8)
+        self.assertEqual(d["special_symbol_count_histogram"],
+                         {"0": 2, "1": 4, "2": 2})
 
     def test_direct_model_is_not_global_validity(self):
         strips = {"0": [
