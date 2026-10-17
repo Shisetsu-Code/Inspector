@@ -116,6 +116,9 @@ def _scene_components(parts: dict[int, bytes]) -> dict:
         "server_symbol_mapping_keys": [],
         "screen_symbol_keys": [],
         "line_paths_declarative": [],
+        "line_paths_directions": [],
+        "line_component_structure": [],
+        "explicit_line_path_status": "NOT_DECLARED",
         "line_paths_are_server_math_proof": False,
         "notes": [],
     }
@@ -182,15 +185,53 @@ def _scene_components(parts: dict[int, bytes]) -> dict:
                                     if isinstance(k, str) and len(k) < 30]
         elif comp_type == "VS_LinesDefinitions":
             lines = data.get("xtEnabled")
-            if not isinstance(lines, list):
-                continue
-            for entry in lines[:30]:
-                if not isinstance(entry, dict) or entry.get("nestedFieldType") != "LineInfo":
-                    continue
-                line = (entry.get("serializableData") or {}).get("symbolIndices")
-                if isinstance(line, list) and 2 <= len(line) <= 12 and all(
-                        isinstance(v, int) and 0 <= v <= 250 for v in line):
-                    report["line_paths_declarative"].append(line)
+            declared_count = data.get("lines")
+            count = declared_count if type(declared_count) is int and 0 <= declared_count <= 500 else None
+            shape = {
+                "scene_field_names": sorted(
+                    key for key in data.keys()
+                    if isinstance(key, str) and len(key) <= 48)[:50],
+                "declared_line_count": count,
+                "declared_reel_count": (
+                    data.get("reels") if type(data.get("reels")) is int else None),
+                "symbol_refs_count": (
+                    len(data["symbols"]) if isinstance(data.get("symbols"), list) else None),
+                "xt_enabled_entries": len(lines) if isinstance(lines, list) else None,
+                "xt_first_entry_field_names": (
+                    sorted(lines[0]) if isinstance(lines, list)
+                    and lines and isinstance(lines[0], dict) else []),
+                "xt_first_nested_type": (
+                    lines[0].get("nestedFieldType") if isinstance(lines, list)
+                    and lines and isinstance(lines[0], dict)
+                    and isinstance(lines[0].get("nestedFieldType"), str) else None),
+                "xt_first_serialized_field_names": (
+                    sorted((lines[0].get("serializableData") or {}).keys())
+                    if isinstance(lines, list) and lines and isinstance(lines[0], dict)
+                    and isinstance(lines[0].get("serializableData"), dict) else []),
+            }
+            report["line_component_structure"].append(shape)
+            if isinstance(lines, list):
+                for entry in lines[:500]:
+                    if not isinstance(entry, dict) or entry.get("nestedFieldType") != "LineInfo":
+                        continue
+                    record = entry.get("serializableData") or {}
+                    path = record.get("symbolIndices")
+                    if isinstance(path, list) and 2 <= len(path) <= 12 and all(
+                            type(v) is int and 0 <= v <= 250 for v in path):
+                        report["line_paths_declarative"].append(path)
+                        direction = record.get("isRightToLeft")
+                        report["line_paths_directions"].append(
+                            direction if type(direction) is bool else None)
+            verified = len(report["line_paths_declarative"])
+            if count is not None and count > 0 and verified == count:
+                report["explicit_line_path_status"] = "COMPLETE_DECLARATION"
+            elif count is not None and count > 0:
+                report["explicit_line_path_status"] = "COUNT_ONLY_OR_PARTIAL_PATHS"
+            elif verified:
+                report["explicit_line_path_status"] = "PATHS_WITHOUT_COUNT"
+            else:
+                report["explicit_line_path_status"] = "NO_EXPLICIT_LINES_IN_COMPONENT"
+
     return report
 
 
