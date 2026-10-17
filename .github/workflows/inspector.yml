@@ -9,7 +9,7 @@ on:
         description: Ficha oficial del juego Pragmatic (https)
         required: false
         type: string
-        default: https://www.pragmaticplay.com/en/games/big-bass-vegas-1000/
+        default: https://www.pragmaticplay.com/en/games/deep-sea-frenzy/?gamelang=en&cur=USD
 
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
-      INSPECTOR_GAME_URL: ${{ inputs.game_url || 'https://www.pragmaticplay.com/en/games/big-bass-vegas-1000/' }}
+      INSPECTOR_GAME_URL: ${{ inputs.game_url || 'https://www.pragmaticplay.com/en/games/deep-sea-frenzy/?gamelang=en&cur=USD' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
