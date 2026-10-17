@@ -290,6 +290,8 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     from .line_stake_evidence import (inspect_line_scene, inspect_wild_alphabets,
                                       inspect_stake_declarations)
     line_scene = inspect_line_scene(src, symbol, width, height)
+    from .line_candidates import scan_line_candidates
+    line_candidates = scan_line_candidates(src, symbol, width, height)
     stake = inspect_stake_declarations(response)
     wild = inspect_wild_alphabets(sets)
     full_evidence = {
@@ -327,7 +329,11 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "payment_line_cash_validation_possible": False,
         "payline_components": line_scene["vs_lines_definitions_count"],
         "recovered_line_paths": len(line_scene["lines_recovered"]),
-        "line_geometry_status": line_scene["line_path_coverage"],
+        "line_scene_scan_status": line_scene["line_path_coverage"],
+        "lineinfo_fields": {
+            v["field"]: v["line_info_records"]
+            for v in line_candidates["candidate_fields"]
+        },
         "wild_W_reels": wild["reels_containing_W_directly_by_set"],
         "stake_sc_values_count": stake["sc_count"],
         "stake_bls_values": stake["bls_values"],
@@ -374,6 +380,7 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     write_json(out / "payment_contract.json", pay_contract)
     write_json(out / "line_geometry.json", line_contract)
     write_json(out / "line_stake_evidence.json", full_evidence)
+    write_json(out / "line_candidates.json", line_candidates)
     write_json(out / "official_feature_rules.json", official_features)
     write_json(out / "direct_model.json", direct)
     write_json(out / "client_evidence.json", client)
@@ -425,6 +432,8 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "Simulador local acoplado a escena: " + str(client["scene"]["offline_server_attachment"]),
         "Recursos estáticos indexados: " + str(len(static_assets)),
         "build.js observado: " + str(summary["has_build_js"]),
+        "LineInfo por campo: " + ", ".join(
+            f"{x['field']}={x['line_info_records']}" for x in line_candidates["candidate_fields"]),
         "Líneas extraídas de escena: " + str(len(line_scene["lines_recovered"]))
         + "; cobertura: " + line_scene["line_path_coverage"],
         "sc declaradas: " + str(stake["sc_count"])
