@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from inspector.screen_evaluator import evaluate_screen_literals
 from inspector.line_stake_evidence import (
     inspect_line_scene, inspect_stake_declarations, inspect_wild_alphabets,
     line_hypothetical,
@@ -109,6 +110,44 @@ class LineStakeTests(unittest.TestCase):
         self.assertFalse(evidence["hypothetical_sc_times_bls"]["formula_proven_as_real_stake"])
         self.assertFalse(evidence["payout_cash_scaling_proven"])
         self.assertEqual(evidence["actual_stake_for_arbitrary_screen"], "UNKNOWN")
+
+    def test_full_screen_evaluation_strictly_conditional(self):
+        payment = {
+            "symbols": {
+                "1": {"payouts_by_count": {"3": "10"}},
+                "4": {"payouts_by_count": {"5": "100"}},
+            },
+        }
+        evidence = {"paylines": {
+            "line_path_coverage": "MATCHES_DECLARED_SCENE_LINE_COUNT",
+            "lines_recovered": [
+                {"positions_row_major": [0,1,2,3,4], "direction": "LEFT_TO_RIGHT"},
+                {"positions_row_major": [5,6,7,8,9], "direction": "RIGHT_TO_LEFT"},
+            ],
+        }}
+        sample = "11124" + "44444" + "22113"
+        outcome = evaluate_screen_literals(sample, payment, evidence, 5, 3)
+        self.assertEqual(outcome["conditional_payout_candidates"], 2)
+        self.assertEqual(outcome["cash_amount"], "UNKNOWN")
+        self.assertFalse(outcome["active_line_set_verified"])
+        self.assertEqual(outcome["server_outcome_validity"], "UNKNOWN")
+        self.assertEqual(outcome["matches"][0]["paytable_multiplier_if_conditions_met"], "10")
+        self.assertEqual(outcome["matches"][1]["paytable_multiplier_if_conditions_met"], "100")
+        changed = evaluate_screen_literals("1W124" + "44444" + "22113", payment, evidence, 5, 3)
+        self.assertEqual(changed["matches"][0]["status"], "SPECIAL_SYMBOL_SEMANTICS_UNKNOWN")
+        self.assertIsNone(changed["matches"][0]["paytable_multiplier_if_conditions_met"])
+
+    def test_full_screen_without_scene_lines_cannot_calculate_payout(self):
+        result = evaluate_screen_literals(
+            "11124" + "44444" + "22113",
+            {"symbols": {"1": {"payouts_by_count": {"3": "10"}}}},
+            {"paylines": {"lines_recovered": [], "line_path_coverage": "COUNT_ONLY_NO_PATHS"}},
+            5, 3)
+        self.assertEqual(result["status"], "NO_DECLARED_LINE_PATHS")
+        self.assertEqual(result["conditional_payout_candidates"], 0)
+        self.assertEqual(result["cash_amount"], "UNKNOWN")
+        with self.assertRaises(ValueError):
+            evaluate_screen_literals("12", {}, {}, 5, 3)
 
     def test_w_literal_not_wild_proof(self):
         out = inspect_wild_alphabets({
