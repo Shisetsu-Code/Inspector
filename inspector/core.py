@@ -283,6 +283,29 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
             "complete_feature_rules_proven": False,
         }
     pay_contract["official_description_feature_rules"] = official_features
+    from .line_stake_evidence import (inspect_line_scene, inspect_wild_alphabets,
+                                      inspect_stake_declarations)
+    line_scene = inspect_line_scene(src, symbol, width, height)
+    stake = inspect_stake_declarations(response)
+    wild = inspect_wild_alphabets(sets)
+    full_evidence = {
+        "schema": "inspector/line-stake-bundle/v1",
+        "game_symbol": symbol,
+        "paylines": line_scene,
+        "monetary": stake,
+        "wild": wild,
+        "actual_win_validation": "UNAVAILABLE_WITHOUT_COMPLETE_SEMANTICS",
+        "server_generator_extracted": False,
+    }
+    # Solo líneas con referencias espaciales coherentes, y no sobreafirmar
+    # que el servidor las haya habilitado para la apuesta actual.
+    pay_contract["declared_line_paths"] = [
+        row["positions_row_major"] for row in line_scene["lines_recovered"]
+    ]
+    pay_contract["payline_geometry_complete"] = bool(
+        line_scene["complete_all_active_paylines_known"]
+    )
+    pay_contract["bet_denominator_known"] = False
     summary = {
         "schema": SCHEMA, "game_symbol": symbol,
         "doInit_count": len(initializations), "historical_spins": len(spins),
@@ -292,6 +315,15 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "reel_strip_count": sum(len(x) for x in sets.values()),
         "geometry": {"width": width, "height": height, "type": response.get("st")},
         "paytable_symbols": len(paytable),
+        "payline_components": line_scene["vs_lines_definitions_count"],
+        "recovered_line_paths": len(line_scene["lines_recovered"]),
+        "line_geometry_status": line_scene["line_path_coverage"],
+        "wild_W_reels": wild["reels_containing_W_directly_by_set"],
+        "stake_sc_values_count": stake["sc_count"],
+        "stake_bls_values": stake["bls_values"],
+        "stake_sc_times_bls_min": stake["hypothetical_sc_times_bls"]["minimum"],
+        "stake_sc_times_bls_max": stake["hypothetical_sc_times_bls"]["maximum"],
+        "stake_formula_proven": False,
         "paytable_two_symbol_paying_ids": pay_contract["symbols_with_2_count_payout"],
         "paytable_three_symbol_paying_ids": pay_contract["symbols_with_3_count_payout"],
         "scatter_declaration_status": pay_contract["scatter"]["status"],
@@ -330,6 +362,7 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     })
     write_json(out / "paytable.json", paytable)
     write_json(out / "payment_contract.json", pay_contract)
+    write_json(out / "line_stake_evidence.json", full_evidence)
     write_json(out / "official_feature_rules.json", official_features)
     write_json(out / "direct_model.json", direct)
     write_json(out / "client_evidence.json", client)
@@ -381,6 +414,14 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "Simulador local acoplado a escena: " + str(client["scene"]["offline_server_attachment"]),
         "Recursos estáticos indexados: " + str(len(static_assets)),
         "build.js observado: " + str(summary["has_build_js"]),
+        "Líneas extraídas de escena: " + str(len(line_scene["lines_recovered"]))
+        + "; cobertura: " + line_scene["line_path_coverage"],
+        "sc declaradas: " + str(stake["sc_count"])
+        + "; bls declaradas: " + str(stake["bls_values"]),
+        "Hipótesis sc*bls mínimo/máximo: "
+        + str(stake["hypothetical_sc_times_bls"]["minimum"]) + "/"
+        + str(stake["hypothetical_sc_times_bls"]["maximum"]),
+        "Fórmula de apuesta real/semántica W: DESCONOCIDAS",
         "Símbolos con premio declarado desde 2 coincidencias: "
         + ", ".join(summary["paytable_two_symbol_paying_ids"]),
         "Símbolos con premio declarado desde 3 coincidencias: "
