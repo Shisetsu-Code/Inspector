@@ -264,6 +264,8 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     }
     client = inspect_client_har(src, symbol, observed_wire_keys=observed)
     animation = client["animation_origin_trace"]
+    from .line_evaluator import extract_line_contract
+    line_contract = extract_line_contract(client["scene"], width, height)
     from .payment_contract import build_payment_contract
     pay_contract = build_payment_contract(
         paytable,
@@ -283,6 +285,8 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
             "complete_feature_rules_proven": False,
         }
     pay_contract["official_description_feature_rules"] = official_features
+    pay_contract["explicit_line_geometry_status"] = line_contract["status"]
+    pay_contract["payline_geometry_complete"] = line_contract["geometry_complete"]
     from .line_stake_evidence import (inspect_line_scene, inspect_wild_alphabets,
                                       inspect_stake_declarations)
     line_scene = inspect_line_scene(src, symbol, width, height)
@@ -317,6 +321,10 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "reel_strip_count": sum(len(x) for x in sets.values()),
         "geometry": {"width": width, "height": height, "type": response.get("st")},
         "paytable_symbols": len(paytable),
+        "declared_payline_count": line_contract["declared_line_count"],
+        "line_geometry_status": line_contract["status"],
+        "explicit_paths_ready": len(line_contract["extracted_paths"]),
+        "payment_line_cash_validation_possible": False,
         "payline_components": line_scene["vs_lines_definitions_count"],
         "recovered_line_paths": len(line_scene["lines_recovered"]),
         "line_geometry_status": line_scene["line_path_coverage"],
@@ -364,6 +372,7 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     })
     write_json(out / "paytable.json", paytable)
     write_json(out / "payment_contract.json", pay_contract)
+    write_json(out / "line_geometry.json", line_contract)
     write_json(out / "line_stake_evidence.json", full_evidence)
     write_json(out / "official_feature_rules.json", official_features)
     write_json(out / "direct_model.json", direct)
@@ -424,6 +433,9 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         + str(stake["hypothetical_sc_times_bls"]["minimum"]) + "/"
         + str(stake["hypothetical_sc_times_bls"]["maximum"]),
         "Fórmula de apuesta real/semántica W: DESCONOCIDAS",
+        "Geometría de líneas: " + line_contract["status"],
+        "Líneas declaradas: " + str(line_contract["declared_line_count"]),
+        "Recorridos de línea verificados: " + str(len(line_contract["extracted_paths"])),
         "Símbolos con premio declarado desde 2 coincidencias: "
         + ", ".join(summary["paytable_two_symbol_paying_ids"]),
         "Símbolos con premio declarado desde 3 coincidencias: "
