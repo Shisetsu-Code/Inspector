@@ -107,3 +107,6 @@ Detalles técnicos: [Animaciones, protocolo y origen de los resultados](docs/ANI
 - inspector/gui.py — interfaz Tkinter.
 - tests/ — regresiones sintéticas offline.
 - .github/workflows/inspector.yml — CI y captura remota.
+
+
+**Última comprobación automatizada:** [Deep Sea Frenzy — animación, selectores y modelo directo](docs/DEEP_SEA_ANIMACION_SELECTOR_2026-10-17.md).
