@@ -1,11 +1,78 @@
-# Inspector — Pragmatic Play HAR Analyzer
+# Inspector — Pragmatic Play HAR
 
-Herramienta de escritorio y línea de comandos para capturar pasivamente la inicialización de **demos oficiales** de Pragmatic Play, analizar archivos HAR y extraer restricciones documentables: tiras de carretes, alfabetos, ventanas circulares, tablas de pago y metadatos de cliente.
+**Inspector** es una herramienta local de Windows y un workflow de GitHub Actions para recuperar **automáticamente** los recursos de inicialización de demos oficiales Pragmatic Play. No requiere operar el juego y nunca envía giros o compras.
 
-**Principio de seguridad:** se permiten solicitudes de inicialización `doInit` y descargas GET de recursos; no se envían giros, compras ni elecciones. En GitHub Actions no se publica el HAR sin depurar (puede contener sesiones). El artefacto es un informe y un HAR reducido con campos públicos de configuración.
+El usuario puede seleccionar cualquier HAR ya capturado en la interfaz gráfica, o utilizar Actions para crear un HAR **en el runner de GitHub**: Playwright abre la ficha oficial, localiza la URL de la demo, registra el tráfico del navegador y procesa la respuesta de inicialización doInit. El HAR de red completo es temporal; el artefacto publicable está depurado.
 
-**Límite científico:** las ventanas de las tiras describen el modelo de parada directa sin transformaciones. Su ausencia NO prueba que una pantalla final sea matemáticamente imposible. La clasificación global permanece «desconocida» salvo prueba del generador del servidor.
+## Estado real de la investigación
 
-## Uso
+En las capturas de Big Bass Vegas 1000 (vs10bbveg1000) y Forever Split Megaways (vswaysmgrmgw) detectamos que doInit incluye conjuntos de tiras y tablas de pago. Algunos resultados reales NO son ventanas consecutivas del conjunto publicado: el cliente puede mostrar símbolos devueltos por el servidor independientemente de sus tiras de animación.
 
-Consulta el workflow **Inspector CI / captura demo** en Actions. También existe interfaz gráfica local con Tkinter para Windows 10/11. Los archivos fuente y la documentación operativa se incorporan en el siguiente commit.
+**Por lo tanto, estos datos NO permiten conocer todas las tiradas permitidas y prohibidas por el RNG real.** Inspector diferencia la compatibilidad con paradas directas de la validez global del servidor, que queda en UNKNOWN. No interpreta palabras como random o transform en el JavaScript como prueba de que exista un RNG local.
+
+## Windows (interfaz gráfica)
+
+Instalar Python 3.11 o posterior, clonar o descargar el código del repositorio y ejecutar:
+
+    Abrir_Inspector.cmd
+
+Elegir el archivo HAR, la carpeta de resultados y pulsar **Analizar HAR**. La herramienta funciona offline, no usa navegador y no modifica el HAR.
+
+## Línea de comandos
+
+Analizar una captura local:
+
+    py -3 -m inspector.cli analyze "C:\Capturas\juego.har" --out resultado
+
+Capturar y analizar una demo oficial automáticamente, sin clics ni giros:
+
+    py -3 -m pip install -r requirements-online.txt
+    py -3 -m playwright install chromium
+    py -3 -m inspector.cli capture "https://www.pragmaticplay.com/en/games/big-bass-vegas-1000/" --out resultado --require-init
+
+Por defecto el HAR original de captura se borra. Para conservarlo **solo en tu PC** se puede utilizar la opción --keep-raw-har con una ruta; podría contener credenciales efímeras.
+
+Pruebas unitarias:
+
+    py -3 -m unittest discover -s tests -v
+
+## GitHub Actions
+
+Ir a **Actions → Inspector CI y captura demo**. El workflow corre al subir código a main y también manualmente mediante **Run workflow**, donde admite otra URL de ficha oficial.
+
+El job tests comprueba extracción, ventanas circulares y ocultación de credenciales. El job capture instala Chromium, abre la demo y procesa su inicialización. No pulsa Spin y bloquea métodos mutadores salvo POST action=doInit del proveedor. La captura requiere que el proveedor permita acceso desde la infraestructura de GitHub.
+
+En cada ejecución, descargar el artefacto inspector-resultados-depurados. No se publica un HAR de sesión: se genera sanitized-init.har, un subconjunto reproducible de doInit con las claves reel_set*, paytable y geometría. Los activos JavaScript propietarios no se cargan como artefactos, pero su existencia y hashes quedan registrados.
+
+### Archivos de resultados
+
+| Archivo | Significado |
+| --- | --- |
+| summary.json | Identidad, cantidad de inicializaciones, tiras, activos y límites |
+| reel_rules.json | Tiras, alfabetos y ventanas circulares exactas (longitud 1–4) |
+| paytable.json | Tabla de pagos declarada por el juego |
+| historical_audit.json | Comparación de giros capturados con el modelo directo |
+| assets_index.json | SHA256, tamaño e indicadores de scripts, sin código propietario |
+| sanitized-init.har | HAR reducido solo a parámetros públicos de inicialización |
+| report.md | Diagnóstico resumido |
+| capture_status.json | Evidencia de carga, doInit y solicitudes bloqueadas (solo en modo captura) |
+
+### Advertencias técnicas
+
+- El HTML de la página y el formato de la API pueden cambiar.
+- No se eluden bloqueos, desafíos ni controles de sesión.
+- El servidor puede producir resultados que no se reconstruyen a partir de las tiras locales.
+- La ausencia de una ventana en las tiras **NO significa** que una pantalla final esté prohibida.
+- La captura HAR es generada por Chromium; no es un archivo HAR que el proveedor entregue para descargar.
+- No colocar HAR originales, tokens o bundles propietarios en un repositorio público.
+
+Más detalles: [Arquitectura](docs/ARCHITECTURA.md) · [Operación](docs/OPERACION.md).
+
+## Organización del proyecto
+
+- inspector/core.py — lectura y normalización offline.
+- inspector/capture.py — navegación pasiva de demo con Playwright.
+- inspector/cli.py — ejecución automatizada.
+- inspector/gui.py — interfaz Tkinter.
+- tests/ — regresiones sintéticas offline.
+- .github/workflows/inspector.yml — CI y captura remota.
