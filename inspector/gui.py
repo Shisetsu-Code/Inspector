@@ -105,6 +105,23 @@ def main() -> None:
             append("Escena del cliente: " + scene)
             if scene == "PARSED":
                 append("Detalles en client_evidence.json")
+            try:
+                trace = json.loads((value[0] / "animation_origin_trace.json").read_text(encoding="utf-8"))
+                animation = trace.get("interpretation", "UNKNOWN")
+                append("Origen de animaciones: " + animation)
+                selector_fields = [
+                    f"{k}: {v['status']}"
+                    for k, v in trace.get("protocol_fields", {}).items()
+                    if v.get("dictionary_declared_in_client")
+                ]
+                if selector_fields:
+                    append("Selectores de protocolo (no necesariamente activos):")
+                    for item in selector_fields[:12]:
+                        append("  " + item)
+                if trace.get("stop_logic", {}).get("blank_symbol_random_replacement_branch"):
+                    append("Math.random detectado en sustitución visual; NO prueba RNG del servidor")
+            except (OSError, ValueError, KeyError):
+                append("El análisis de animación no pudo abrirse; consultar report.md")
             append("Validez matemática global del servidor: DESCONOCIDA")
             append("Archivos guardados: " + str(value[0]))
 
