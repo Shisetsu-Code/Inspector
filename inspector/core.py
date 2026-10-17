@@ -203,7 +203,6 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     from .direct_model import compute_direct_model
     from .client_evidence import inspect_client_har
     direct = compute_direct_model(sets, width, height)
-    client = inspect_client_har(src, symbol)
     audits = [observe_spin(x["screen"], sets, width, height)
               for x in spins if isinstance(x["screen"], str) and len(x["screen"]) <= 300]
     symbol = latest.get("symbol")
@@ -213,6 +212,7 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
             if match:
                 symbol = match.group(1)
                 break
+    client = inspect_client_har(src, symbol)
     summary = {
         "schema": SCHEMA, "game_symbol": symbol,
         "doInit_count": len(initializations), "historical_spins": len(spins),
