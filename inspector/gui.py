@@ -8,18 +8,21 @@ import webbrowser
 
 from .core import analyze_har
 from .direct_model import check_screen
+from .payment_contract import evaluate_symbol_count
 
 
 def main() -> None:
     window = tk.Tk()
     window.title("Inspector — Pragmatic HAR")
-    window.geometry("820x530")
+    window.geometry("830x610")
     window.minsize(650, 365)
     selected = tk.StringVar()
     output = tk.StringVar(value=str(Path.home() / "Inspector_resultados"))
     status = tk.StringVar(value="Seleccioná un HAR para comenzar.")
     running = tk.BooleanVar(value=False)
     screen_text = tk.StringVar()
+    payout_symbol = tk.StringVar(value="1")
+    payout_count = tk.StringVar(value="2")
     result_folder = [None]
 
     body = ttk.Frame(window, padding=18)
@@ -68,6 +71,38 @@ def main() -> None:
         except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
             messagebox.showerror("Consulta de pantalla", str(exc))
     ttk.Button(qrow, text="Comprobar pantalla", command=query_screen).pack(side="left", padx=6)
+
+    ttk.Label(body, text="Tabla de pagos (condición por símbolo; no confirma cobro real)").pack(
+        anchor="w", pady=(3, 2))
+    prow = ttk.Frame(body); prow.pack(fill="x", pady=(0, 8))
+    ttk.Label(prow, text="Símbolo").pack(side="left")
+    ttk.Entry(prow, textvariable=payout_symbol, width=8).pack(side="left", padx=(4, 12))
+    ttk.Label(prow, text="Coincidencias").pack(side="left")
+    ttk.Combobox(prow, textvariable=payout_count, width=5, state="readonly",
+                 values=[str(i) for i in range(1, 13)]).pack(side="left", padx=(4, 12))
+    def query_payment():
+        if not result_folder[0]:
+            messagebox.showinfo("Inspector", "Primero analizá un HAR.")
+            return
+        try:
+            folder = result_folder[0]
+            contract = json.loads((folder / "payment_contract.json").read_text(encoding="utf-8"))
+            record = evaluate_symbol_count(contract, payout_symbol.get().strip(),
+                                           int(payout_count.get()))
+            if record["table_entry_exists"]:
+                append("Paytable: símbolo {} × {} -> multiplicador {} (declarado)".format(
+                    record["symbol"], record["count"], record["declared_multiplier"]))
+            elif record["status"] == "NO_TABLE_ENTRY":
+                append("Paytable: NO hay entrada para símbolo {} con {} coincidencias".format(
+                    record["symbol"], record["count"]))
+            else:
+                append("Símbolo {}: no identificado en la tabla de pagos".format(record["symbol"]))
+            append("El cobro efectivo requiere línea/vía válida, wilds, apuesta y estado del servidor.")
+            scatter_status = contract.get("scatter", {}).get("status", "UNKNOWN")
+            append("Free Spins: umbral de activación NO DEMOSTRADO. Tabla scatter: " + scatter_status)
+        except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
+            messagebox.showerror("Consulta de paytable", str(exc))
+    ttk.Button(prow, text="Evaluar condición", command=query_payment).pack(side="left")
 
     log = tk.Text(body, wrap="word", height=8)
     log.pack(fill="both", expand=True)
@@ -130,6 +165,11 @@ def main() -> None:
                     append("Pantallas del modelo directo para ese set: {:,}".format(count_sel).replace(",", "."))
             else:
                 append("reel_set inicial: " + info.get("initial_reel_set_status", "UNKNOWN"))
+            pay_ids = info.get("paytable_two_symbol_paying_ids", [])
+            if pay_ids:
+                append("También pagan con 2 coincidencias: " + ", ".join(pay_ids))
+            append("Free spins: " + info.get("scatter_declaration_status", "NOT_DECLARED")
+                   + " (umbral pendiente de demostrar)")
             append("Validez matemática global del servidor: DESCONOCIDA")
             append("Archivos guardados: " + str(value[0]))
 
