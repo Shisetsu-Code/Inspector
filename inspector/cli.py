@@ -10,7 +10,6 @@ from .capture import capture_official_demo
 from .direct_model import check_screen
 from .payment_contract import evaluate_symbol_count, evaluate_literal_line, evaluate_declared_bonus
 from .line_evaluator import evaluate_literal_screen
-from .screen_evaluator import evaluate_screen_literals
 
 
 def main(argv=None) -> int:
@@ -54,13 +53,12 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "screen-pay":
+            # Alias histórico: ahora exige líneas explícitas verificadas por
+            # la misma validación estricta usada en evaluate-screen y la GUI.
             folder = args.result_folder
-            contract = json.loads((folder / "payment_contract.json").read_text(encoding="utf-8"))
-            evidence = json.loads((folder / "line_stake_evidence.json").read_text(encoding="utf-8"))
-            summary = json.loads((folder / "summary.json").read_text(encoding="utf-8"))
-            result = evaluate_screen_literals(
-                args.screen, contract, evidence,
-                summary["geometry"]["width"], summary["geometry"]["height"])
+            lines = json.loads((folder / "line_geometry.json").read_text(encoding="utf-8"))
+            payment = json.loads((folder / "payment_contract.json").read_text(encoding="utf-8"))
+            result = evaluate_literal_screen(args.screen, lines, payment)
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0
         if args.command == "evaluate-screen":
