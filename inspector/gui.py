@@ -8,13 +8,13 @@ import webbrowser
 
 from .core import analyze_har
 from .direct_model import check_screen
-from .payment_contract import evaluate_symbol_count
+from .payment_contract import evaluate_symbol_count, evaluate_declared_bonus
 
 
 def main() -> None:
     window = tk.Tk()
     window.title("Inspector — Pragmatic HAR")
-    window.geometry("830x610")
+    window.geometry("880x680")
     window.minsize(650, 365)
     selected = tk.StringVar()
     output = tk.StringVar(value=str(Path.home() / "Inspector_resultados"))
@@ -23,6 +23,9 @@ def main() -> None:
     screen_text = tk.StringVar()
     payout_symbol = tk.StringVar(value="1")
     payout_count = tk.StringVar(value="2")
+    bonus_money = tk.StringVar(value="8")
+    bonus_collect = tk.BooleanVar(value=True)
+    bonus_plus_one = tk.BooleanVar(value=False)
     result_folder = [None]
 
     body = ttk.Frame(window, padding=18)
@@ -104,6 +107,35 @@ def main() -> None:
             messagebox.showerror("Consulta de paytable", str(exc))
     ttk.Button(prow, text="Evaluar condición", command=query_payment).pack(side="left")
 
+    ttk.Label(body, text="Bonus (money symbols y Collect, según reglas publicadas)").pack(
+        anchor="w", pady=(4, 2))
+    brow = ttk.Frame(body); brow.pack(fill="x", pady=(0, 9))
+    ttk.Label(brow, text="Money symbols").pack(side="left")
+    ttk.Entry(brow, textvariable=bonus_money, width=5).pack(side="left", padx=(5, 9))
+    ttk.Checkbutton(brow, text="Collect carrete 5", variable=bonus_collect).pack(side="left", padx=5)
+    ttk.Checkbutton(brow, text="Collect +1", variable=bonus_plus_one).pack(side="left", padx=5)
+    def query_bonus():
+        if not result_folder[0]:
+            messagebox.showinfo("Inspector", "Primero analizá un HAR.")
+            return
+        try:
+            contract = json.loads((result_folder[0] / "payment_contract.json").read_text(encoding="utf-8"))
+            checked = evaluate_declared_bonus(
+                contract, money_symbol_count=int(bonus_money.get()),
+                collect_on_reel_5=bool(bonus_collect.get()),
+                collect_plus_one=bool(bonus_plus_one.get()))
+            if checked["status"] == "CONTRACT_UNKNOWN":
+                append("BONUS: no hay regla pública reconocida en la captura; estado desconocido.")
+            elif checked["bonus_trigger_declared_match"]:
+                append("BONUS: cumple regla publicada; {} free spins iniciales.".format(
+                    checked["predicted_initial_free_spins"]))
+            else:
+                append("BONUS: no cumple la condición publicada de activación.")
+            append("Fuente: ficha oficial. Resultado de servidor NO VERIFICADO.")
+        except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
+            messagebox.showerror("Consulta de bonus", str(exc))
+    ttk.Button(brow, text="Evaluar bonus", command=query_bonus).pack(side="left", padx=5)
+
     log = tk.Text(body, wrap="word", height=8)
     log.pack(fill="both", expand=True)
     log.insert("end", "Se extraen tiras, tabla de pagos, huellas de archivos y auditoría del modelo directo.\n")
@@ -168,6 +200,11 @@ def main() -> None:
             pay_ids = info.get("paytable_two_symbol_paying_ids", [])
             if pay_ids:
                 append("También pagan con 2 coincidencias: " + ", ".join(pay_ids))
+            append("Regla de bonus de ficha oficial: "
+                   + info.get("official_feature_rules_status", "NOT_AVAILABLE_IN_HAR"))
+            if info.get("official_bonus_min_money_symbols") is not None:
+                append("Umbral publicado: {} money symbols + Collect; {} free spins.".format(
+                    info["official_bonus_min_money_symbols"], info["official_initial_free_spins"]))
             append("Free spins: " + info.get("scatter_declaration_status", "NOT_DECLARED")
                    + " (umbral pendiente de demostrar)")
             append("Validez matemática global del servidor: DESCONOCIDA")
