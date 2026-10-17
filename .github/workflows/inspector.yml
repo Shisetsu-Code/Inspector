@@ -47,6 +47,7 @@ jobs:
         id: analysis
         continue-on-error: true
         run: |
+          set -o pipefail
           python -m inspector.cli capture "$INSPECTOR_GAME_URL" --seconds 75 --out run-results --require-init | tee capture.log
       - name: Publicar informe en resumen de GitHub
         if: always()
