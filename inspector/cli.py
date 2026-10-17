@@ -8,7 +8,7 @@ import tempfile
 from .core import analyze_har
 from .capture import capture_official_demo
 from .direct_model import check_screen
-from .payment_contract import evaluate_symbol_count, evaluate_literal_line
+from .payment_contract import evaluate_symbol_count, evaluate_literal_line, evaluate_declared_bonus
 
 
 def main(argv=None) -> int:
@@ -36,8 +36,22 @@ def main(argv=None) -> int:
     l = sub.add_parser("pay-line", help="Simular prefijo literal de línea, NO cobro real")
     l.add_argument("result_folder", type=Path)
     l.add_argument("symbols")
+    b = sub.add_parser("bonus-check", help="Evaluar condición pública de money symbols + Collect")
+    b.add_argument("result_folder", type=Path)
+    b.add_argument("money_symbols", type=int)
+    b.add_argument("--collect-reel5", action="store_true",
+                   help="Confirmar Collect en el carrete 5")
+    b.add_argument("--plus-one", action="store_true",
+                   help="Collect +1 spin en la misma tirada")
     args = parser.parse_args(argv)
     try:
+        if args.command == "bonus-check":
+            contract = json.loads((args.result_folder / "payment_contract.json").read_text(encoding="utf-8"))
+            result = evaluate_declared_bonus(
+                contract, money_symbol_count=args.money_symbols,
+                collect_on_reel_5=args.collect_reel5, collect_plus_one=args.plus_one)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
         if args.command in {"pay-count", "pay-line"}:
             contract = json.loads((args.result_folder / "payment_contract.json").read_text(encoding="utf-8"))
             result = (evaluate_symbol_count(contract, args.symbol, args.count)
