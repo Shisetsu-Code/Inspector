@@ -1,6 +1,7 @@
 """Regresiones offline para tabla de pagos y Free Spins sin inventar reglas."""
 import unittest
 
+from inspector.official_rules import extract_official_feature_rules
 from inspector.payment_contract import (
     build_payment_contract, evaluate_literal_line, evaluate_symbol_count,
     extract_scatter_declarations,
@@ -49,6 +50,37 @@ class PaymentContractTests(unittest.TestCase):
         self.assertFalse(r["table_entry_exists"])
         with self.assertRaises(ValueError):
             evaluate_literal_line(self.contract,"?42")
+
+
+    def test_deep_sea_official_description_gives_distinct_trigger(self):
+        html = """
+        <html><head><script>window.secret='SHOULD_NOT_BE_USED';</script></head>
+        <body><h1>Deep Sea Frenzy</h1>
+        <p>Shark money symbols can land on reels 1-4 with random values of up
+        to 200x, while collect symbols can hit on reel five carrying up to
+        5x multipliers.</p><p>When eight or more money symbols land on the
+        same spin as a collect symbol, their combined value is boosted by
+        any multiplier present and awarded, before the bonus game triggers
+        with five free spins. The +1 Spin collect symbol adds an extra spin
+        to the total.</p></body></html>
+        """
+        rules = extract_official_feature_rules(html,game_slug="deep-sea-frenzy")
+        self.assertEqual(rules["status"],"PUBLIC_DESCRIPTION_CONDITION_PARSED")
+        self.assertEqual(rules["bonus_trigger"]["minimum_money_symbols"],8)
+        self.assertEqual(rules["bonus_trigger"]["money_symbol_reels"],[1,2,3,4])
+        self.assertEqual(rules["bonus_trigger"]["collect_symbol_reel"],5)
+        self.assertEqual(rules["bonus_trigger"]["awarded_free_spins"],5)
+        self.assertTrue(rules["extra_spin"]["collect_plus_one_can_add_one_spin"])
+        self.assertFalse(rules["server_feature_execution_verified"])
+        self.assertFalse(rules["complete_feature_rules_proven"])
+        self.assertNotIn("SHOULD_NOT_BE_USED",str(rules))
+
+    def test_other_game_description_cannot_be_assigned_same_trigger(self):
+        doc = """<h1>Wild Depths</h1><p>3 scatter symbols trigger
+            free spins, with 6, 9 or 12 free spins.</p>"""
+        rules = extract_official_feature_rules(doc,game_slug="wild-depths")
+        self.assertEqual(rules["status"],"NOT_RECOGNIZED")
+        self.assertIsNone(rules["bonus_trigger"])
 
     def test_scatter_parser_preserves_no_proof_of_activation(self):
         scatter = extract_scatter_declarations("12~0,0,10,20~0,0,10,15~1,1,2,2")
