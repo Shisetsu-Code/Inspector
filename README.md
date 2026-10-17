@@ -68,6 +68,7 @@ Detalles matemáticos y verificación: [Modelo de paradas directas](docs/MODELO_
 | paytable.json | Tabla de pagos declarada por el juego |
 | historical_audit.json | Comparación de giros capturados con el modelo directo |
 | direct_model.json | Unión exacta de pantallas de paradas directas y distribución por cantidad de símbolos S |
+| client_evidence.json | Firmas estáticas de `build.js`, componentes de escena y sus límites; no se extrae el RNG del servidor |
 | sample_screen_check.json | Pantalla testigo generada desde las tiras y validación del contrato en Actions |
 | assets_index.json | SHA256, tamaño e indicadores de scripts, sin código propietario |
 | sanitized-init.har | HAR reducido solo a parámetros públicos de inicialización |
@@ -84,6 +85,8 @@ Detalles matemáticos y verificación: [Modelo de paradas directas](docs/MODELO_
 - No colocar HAR originales, tokens o bundles propietarios en un repositorio público.
 
 Más detalles: [Arquitectura](docs/ARCHITECTURA.md) · [Operación](docs/OPERACION.md).
+
+[Inspección del cliente de Deep Sea Frenzy](docs/DEEP_SEA_CLIENTE_EVIDENCIA_2026-10-17.md): analiza `GetNextSymbol`, `stopOnScreenSymbols`, el simulador offline y la diferencia entre renderizado y generación de resultados.
 
 ## Organización del proyecto
 
