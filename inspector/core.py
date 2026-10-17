@@ -178,7 +178,10 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
                                         "response": resp_form})
             elif action == "doSpin":
                 spins.append({"screen": resp_form.get("s", ""),
-                              "action": "doSpin"})
+                              "action": "doSpin",
+                              "observed_fields": sorted(set(resp_form).intersection({
+                                  "reel_set", "n_reel_set", "reel_set_size",
+                                  "tmb", "srf", "n_rsl", "msr"}))})
             continue
         if method == "GET" and status == 200 and STATIC_PATH.search(path):
             content = har_body(response.get("content") or {})
@@ -212,7 +215,19 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
             if match:
                 symbol = match.group(1)
                 break
-    client = inspect_client_har(src, symbol)
+    observed = {
+        "doInit": sorted(set().union(*(
+            set(item["response"]).intersection({
+                "reel_set", "n_reel_set", "reel_set_size",
+                "tmb", "srf", "n_rsl", "msr"})
+            for item in initializations
+        )) if initializations else set()),
+        "doSpin": sorted(set().union(*(
+            set(item.get("observed_fields", [])) for item in spins
+        )) if spins else set()),
+    }
+    client = inspect_client_har(src, symbol, observed_wire_keys=observed)
+    animation = client["animation_origin_trace"]
     summary = {
         "schema": SCHEMA, "game_symbol": symbol,
         "doInit_count": len(initializations), "historical_spins": len(spins),
@@ -232,6 +247,11 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "direct_model_duplicates_removed": direct["duplicated_across_sets"],
         "client_evidence_status": client["scene"]["status"],
         "client_server_result_visual_stop_evidence": client["conclusions"]["server_result_drives_visual_stop_evidence"],
+        "animation_protocol_origin": animation["interpretation"],
+        "animation_server_selector_observed_in_capture": [
+            k for k, v in animation["protocol_fields"].items()
+            if v["status"] == "OBSERVED_IN_CAPTURE"
+        ],
     }
     out.mkdir(parents=True, exist_ok=True)
     write_json(out / "summary.json", summary)
@@ -242,6 +262,7 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
     write_json(out / "paytable.json", paytable)
     write_json(out / "direct_model.json", direct)
     write_json(out / "client_evidence.json", client)
+    write_json(out / "animation_origin_trace.json", animation)
     write_json(out / "assets_index.json", static_assets)
     write_json(out / "historical_audit.json", audits)
     # HAR depurado y reducido: solo doInit y claves públicas conocidas.
@@ -273,6 +294,8 @@ def analyze_har(har_path: str | Path, output_dir: str | Path) -> dict:
         "Pantallas únicas en modelo directo: " + str(direct["union_unique_screen_count"]),
         "Duplicados entre conjuntos: " + str(direct["duplicated_across_sets"]),
         "Escena del cliente: " + client["scene"]["status"],
+        "Origen de símbolos (estático): " + animation["interpretation"],
+        "Selectores observados en la captura: " + ", ".join(summary["animation_server_selector_observed_in_capture"]),
         "Evidencia de parada visual desde resultado del servidor: " + client["conclusions"]["server_result_drives_visual_stop_evidence"],
         "Simulador local acoplado a escena: " + str(client["scene"]["offline_server_attachment"]),
         "Recursos estáticos indexados: " + str(len(static_assets)),
