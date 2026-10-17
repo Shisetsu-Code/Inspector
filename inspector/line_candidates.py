@@ -21,6 +21,8 @@ def scan_line_candidates(har_path: str | Path, symbol: str | None, width: int, h
         "geometry": {"width": width, "height": height},
         "candidate_fields": [],
         "candidate_total": 0,
+        "unique_index_vectors_total": 0,
+        "contains_repeated_identical_lineinfo": False,
         "validated_payline_paths": False,
         "active_paylines_known": False,
         "server_rng_known": False,
@@ -80,6 +82,10 @@ def scan_line_candidates(har_path: str | Path, symbol: str | None, width: int, h
                         "both_compatible_count": 0,
                         "invalid_or_wrong_length": 0,
                         "unknown_directions": 0,
+                        "unique_index_vectors": 0,
+                        "duplicated_lineinfo_records": 0,
+                        "all_indices_identical": False,
+                        "distinct_payline_paths_proven": False,
                         "records": [],
                     }
                     for row in candidates:
@@ -103,8 +109,24 @@ def scan_line_candidates(har_path: str | Path, symbol: str | None, width: int, h
                             "direction": ("RIGHT_TO_LEFT" if dr is True
                                           else "LEFT_TO_RIGHT" if dr is False else "UNKNOWN")
                         })
+                    unique = {tuple(x["indices"]) for x in evidence["records"]}
+                    evidence["unique_index_vectors"] = len(unique)
+                    evidence["duplicated_lineinfo_records"] = len(evidence["records"]) - len(unique)
+                    evidence["all_indices_identical"] = bool(unique) and len(unique) == 1
+                    if evidence["all_indices_identical"] and len(evidence["records"]) > 1:
+                        evidence["interpretation"] = "REPEATED_IDENTICAL_VECTORS_NOT_DISTINCT_PAYLINES"
+                    else:
+                        evidence["interpretation"] = "UNVERIFIED_INDEX_RECORDS"
                     out["candidate_fields"].append(evidence)
                     out["candidate_total"] += len(candidates)
     if not out["candidate_fields"]:
         out["status"] = "NO_LINEINFO_FIELDS"
+    else:
+        out["unique_index_vectors_total"] = len({
+            tuple(row["indices"])
+            for field in out["candidate_fields"] for row in field["records"]
+        })
+        out["contains_repeated_identical_lineinfo"] = any(
+            field["all_indices_identical"] and field["line_info_records"] > 1
+            for field in out["candidate_fields"])
     return out
