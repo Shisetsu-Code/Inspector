@@ -122,6 +122,14 @@ def main() -> None:
                     append("Math.random detectado en sustitución visual; NO prueba RNG del servidor")
             except (OSError, ValueError, KeyError):
                 append("El análisis de animación no pudo abrirse; consultar report.md")
+            selector = info.get("initial_reel_set")
+            if selector is not None:
+                append("reel_set declarado en doInit: " + str(selector))
+                count_sel = info.get("initial_direct_screen_count")
+                if count_sel is not None:
+                    append("Pantallas del modelo directo para ese set: {:,}".format(count_sel).replace(",", "."))
+            else:
+                append("reel_set inicial: " + info.get("initial_reel_set_status", "UNKNOWN"))
             append("Validez matemática global del servidor: DESCONOCIDA")
             append("Archivos guardados: " + str(value[0]))
 
